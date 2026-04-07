@@ -1,16 +1,17 @@
 {
-  "name": "ferbnotice-extension",
+  "name": "ferbtools-extension",
   "version": "1.0.0",
   "private": true,
-  "description": "FerbNotice Chrome extension. Made by Ferb.",
+  "description": "FerbTools Chrome extension toolkit. Made by Ferb.",
   "engines": {
     "node": ">=25.9.0"
   },
   "scripts": {
     "build": "tsc && mkdir -p dist && cp -R static/. dist",
     "build:production": "npm run clean && npm run typecheck && npm run build",
-    "clean": "rm -rf dist ferbnotice-production.zip",
-    "pack": "npm run build:production && cd dist && zip -r ../ferbnotice-production.zip .",
+    "clean": "rm -rf dist ferbtools-production.zip",
+    "pack": "npm run build:production && cd dist && zip -r ../ferbtools-production.zip .",
+    "pack:production": "npm run pack",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

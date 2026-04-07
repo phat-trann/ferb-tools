@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "FerbNotice",
-  "description": "FerbNotice reminds you to check in, tracks your workday, and reminds you to checkout. Made by Ferb.",
+  "name": "FerbTools",
+  "description": "FerbTools is a Chrome extension toolkit. Current tool: check-in and checkout reminders. Made by Ferb.",
   "version": "1.0.0",
   "permissions": ["storage", "tabs", "alarms", "scripting"],
   "host_permissions": ["<all_urls>"],
@@ -12,11 +12,11 @@
     "128": "icons/icon-128.png"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "app/background.js"
   },
   "action": {
-    "default_title": "FerbNotice • Made by Ferb",
-    "default_popup": "popup.html",
+    "default_title": "FerbTools • Made by Ferb",
+    "default_popup": "pages/popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",

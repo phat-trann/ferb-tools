@@ -1,9 +1,10 @@
-namespace NoticeCheckInBackground {
-  const STORAGE_KEY = 'noticeCheckInState';
-  const CHECK_IN_PROMPT_SNOOZE_STORAGE_KEY = 'noticeCheckInPromptSnoozedTabs';
-  const CHECKOUT_REMINDER_PREFIX = 'checkout-reminder';
+namespace FerbToolsBackground {
+  const STORAGE_KEY = 'ferbToolsState';
+  const LEGACY_CHECK_IN_STORAGE_KEY = 'noticeCheckInState';
+  const CHECK_IN_PROMPT_SNOOZE_STORAGE_KEY = 'ferbToolsCheckInPromptSnoozedTabs';
+  const CHECKOUT_REMINDER_PREFIX = 'ferbtools-checkout-reminder';
   const BADGE_REFRESH_ALARM = 'badge-refresh';
-  const EXTENSION_NAME = 'FerbNotice';
+  const EXTENSION_NAME = 'FerbTools';
   const EXTENSION_CREDIT = 'Made by Ferb';
   const DAY_MS = 24 * 60 * 60 * 1000;
   const RECORD_RETENTION_DAYS = 45;
@@ -110,11 +111,11 @@ namespace NoticeCheckInBackground {
 
     if (isGetSettingsMessage(message)) {
       void queueTask(async (): Promise<NoticeSettingsResponse> => {
-        const state: NoticeStorageState = await initializeState();
+        const state: FerbToolsStorageState = await initializeState();
 
         return {
           success: true,
-          settings: state.settings,
+          settings: state.features.checkIn.settings,
           today: getTodayStatus(state, Date.now()),
         };
       }).then(
@@ -244,9 +245,9 @@ namespace NoticeCheckInBackground {
     return scheduledTask;
   }
 
-  async function initializeState(): Promise<NoticeStorageState> {
-    const currentState: NoticeStorageState = await getStorageState();
-    const prunedState: { state: NoticeStorageState; changed: boolean } = pruneState(currentState, Date.now());
+  async function initializeState(): Promise<FerbToolsStorageState> {
+    const currentState: FerbToolsStorageState = await getStorageState();
+    const prunedState: { state: FerbToolsStorageState; changed: boolean } = pruneState(currentState, Date.now());
 
     if (prunedState.changed) {
       await saveStorageState(prunedState.state);
@@ -272,9 +273,9 @@ namespace NoticeCheckInBackground {
       return;
     }
 
-    const state: NoticeStorageState = await initializeState();
+    const state: FerbToolsStorageState = await initializeState();
 
-    if (!state.settings.enabled) {
+    if (!state.features.checkIn.settings.enabled) {
       return;
     }
 
@@ -286,7 +287,7 @@ namespace NoticeCheckInBackground {
 
       if (reminderShown) {
         pendingReminder.checkoutReminderShownAt = now;
-        state.records[pendingReminder.dayKey] = pendingReminder;
+        state.features.checkIn.records[pendingReminder.dayKey] = pendingReminder;
         await saveStorageState(state);
       }
 
@@ -300,7 +301,7 @@ namespace NoticeCheckInBackground {
     }
 
     const dayKey: string = getDayKey(now);
-    const todayRecord: NoticeDailyRecord | undefined = state.records[dayKey];
+    const todayRecord: NoticeDailyRecord | undefined = state.features.checkIn.records[dayKey];
 
     if (todayRecord?.checkInAt) {
       return;
@@ -310,13 +311,13 @@ namespace NoticeCheckInBackground {
       return;
     }
 
-    const promptShown: boolean = await showDailyCheckInPrompt(tab.id, dayKey, state.settings);
+    const promptShown: boolean = await showDailyCheckInPrompt(tab.id, dayKey, state.features.checkIn.settings);
 
     if (!promptShown) {
       return;
     }
 
-    state.records[dayKey] = {
+    state.features.checkIn.records[dayKey] = {
       dayKey,
       promptShownAt: now,
     };
@@ -336,14 +337,14 @@ namespace NoticeCheckInBackground {
       return;
     }
 
-    const state: NoticeStorageState = await initializeState();
+    const state: FerbToolsStorageState = await initializeState();
 
-    if (!state.settings.enabled) {
+    if (!state.features.checkIn.settings.enabled) {
       await refreshActionBadge();
       return;
     }
 
-    const record: NoticeDailyRecord | undefined = state.records[dayKey];
+    const record: NoticeDailyRecord | undefined = state.features.checkIn.records[dayKey];
 
     if (!record || !record.checkInAt || !record.checkoutReminderDueAt || record.checkoutReminderShownAt) {
       await refreshActionBadge();
@@ -365,7 +366,7 @@ namespace NoticeCheckInBackground {
     }
 
     record.checkoutReminderShownAt = Date.now();
-    state.records[dayKey] = record;
+    state.features.checkIn.records[dayKey] = record;
     await saveStorageState(state);
     await refreshActionBadge();
   }
@@ -380,13 +381,13 @@ namespace NoticeCheckInBackground {
 
     const now: number = Date.now();
     const dayKey: string = getDayKey(now);
-    const state: NoticeStorageState = await initializeState();
-    const record: NoticeDailyRecord = state.records[dayKey] ?? { dayKey };
+    const state: FerbToolsStorageState = await initializeState();
+    const record: NoticeDailyRecord = state.features.checkIn.records[dayKey] ?? { dayKey };
     const checkInAt: number = checkInTime ? getLocalTimeTimestamp(now, checkInTime) : now;
-    const isLate: boolean = isLateCheckInTime(checkInAt, state.settings);
+    const isLate: boolean = isLateCheckInTime(checkInAt, state.features.checkIn.settings);
     const checkoutReminderDueAt: number = roundCheckoutReminderTime(
-      checkInAt + minutesToMilliseconds(state.settings.workDurationMinutes),
-      state.settings.roundingSlotMinutes
+      checkInAt + minutesToMilliseconds(state.features.checkIn.settings.workDurationMinutes),
+      state.features.checkIn.settings.roundingSlotMinutes
     );
 
     record.promptShownAt = record.promptShownAt ?? now;
@@ -394,7 +395,7 @@ namespace NoticeCheckInBackground {
     record.checkoutReminderDueAt = checkoutReminderDueAt;
     delete record.checkoutReminderShownAt;
 
-    state.records[dayKey] = record;
+    state.features.checkIn.records[dayKey] = record;
 
     await saveStorageState(state);
     await clearAlarm(getAlarmName(dayKey));
@@ -417,12 +418,12 @@ namespace NoticeCheckInBackground {
   }
 
   async function acknowledgeCheckoutReminder(dayKey: string): Promise<void> {
-    const state: NoticeStorageState = await initializeState();
-    const record: NoticeDailyRecord | undefined = state.records[dayKey];
+    const state: FerbToolsStorageState = await initializeState();
+    const record: NoticeDailyRecord | undefined = state.features.checkIn.records[dayKey];
 
     if (record?.checkInAt && record.checkoutReminderDueAt && !record.checkoutReminderShownAt) {
       record.checkoutReminderShownAt = Date.now();
-      state.records[dayKey] = record;
+      state.features.checkIn.records[dayKey] = record;
       await saveStorageState(state);
     }
 
@@ -430,13 +431,13 @@ namespace NoticeCheckInBackground {
   }
 
   async function updateSettings(settingsPatch: Partial<NoticeSettings>): Promise<NoticeSettingsResponse> {
-    const state: NoticeStorageState = await initializeState();
+    const state: FerbToolsStorageState = await initializeState();
     const nextSettings: NoticeSettings = normalizeSettings({
-      ...state.settings,
+      ...state.features.checkIn.settings,
       ...settingsPatch,
     });
 
-    state.settings = nextSettings;
+    state.features.checkIn.settings = nextSettings;
     await saveStorageState(state);
     await refreshActionBadge();
 
@@ -457,12 +458,12 @@ namespace NoticeCheckInBackground {
 
     const now: number = Date.now();
     const dayKey: string = getDayKey(now);
-    const state: NoticeStorageState = await initializeState();
-    const record: NoticeDailyRecord = state.records[dayKey] ?? { dayKey };
+    const state: FerbToolsStorageState = await initializeState();
+    const record: NoticeDailyRecord = state.features.checkIn.records[dayKey] ?? { dayKey };
     const checkInAt: number = getLocalTimeTimestamp(now, checkInTime);
     const checkoutReminderDueAt: number = roundCheckoutReminderTime(
-      checkInAt + minutesToMilliseconds(state.settings.workDurationMinutes),
-      state.settings.roundingSlotMinutes
+      checkInAt + minutesToMilliseconds(state.features.checkIn.settings.workDurationMinutes),
+      state.features.checkIn.settings.roundingSlotMinutes
     );
     const previousCheckoutReminderDueAt: number | undefined = record.checkoutReminderDueAt;
 
@@ -474,7 +475,7 @@ namespace NoticeCheckInBackground {
       delete record.checkoutReminderShownAt;
     }
 
-    state.records[dayKey] = record;
+    state.features.checkIn.records[dayKey] = record;
 
     await saveStorageState(state);
     await clearAlarm(getAlarmName(dayKey));
@@ -497,9 +498,9 @@ namespace NoticeCheckInBackground {
   async function clearTodayData(): Promise<NoticeClearTodayDataResponse> {
     const now: number = Date.now();
     const dayKey: string = getDayKey(now);
-    const state: NoticeStorageState = await initializeState();
+    const state: FerbToolsStorageState = await initializeState();
 
-    delete state.records[dayKey];
+    delete state.features.checkIn.records[dayKey];
 
     await saveStorageState(state);
     await clearAlarm(getAlarmName(dayKey));
@@ -533,8 +534,8 @@ namespace NoticeCheckInBackground {
     };
   }
 
-  function getPendingCheckoutReminder(state: NoticeStorageState, now: number): NoticeDailyRecord | null {
-    const pendingRecords: NoticeDailyRecord[] = Object.values(state.records)
+  function getPendingCheckoutReminder(state: FerbToolsStorageState, now: number): NoticeDailyRecord | null {
+    const pendingRecords: NoticeDailyRecord[] = Object.values(state.features.checkIn.records)
       .filter((record: NoticeDailyRecord): boolean => {
         return Boolean(record.checkInAt && record.checkoutReminderDueAt && record.checkoutReminderDueAt <= now && !record.checkoutReminderShownAt);
       })
@@ -545,8 +546,8 @@ namespace NoticeCheckInBackground {
     return pendingRecords[0] ?? null;
   }
 
-  function getActiveWorkRecord(state: NoticeStorageState, now: number): NoticeDailyRecord | null {
-    const activeRecords: NoticeDailyRecord[] = Object.values(state.records)
+  function getActiveWorkRecord(state: FerbToolsStorageState, now: number): NoticeDailyRecord | null {
+    const activeRecords: NoticeDailyRecord[] = Object.values(state.features.checkIn.records)
       .filter((record: NoticeDailyRecord): boolean => {
         return Boolean(record.checkInAt && record.checkoutReminderDueAt && record.checkoutReminderDueAt > now);
       })
@@ -587,9 +588,9 @@ namespace NoticeCheckInBackground {
     await saveSnoozedCheckInPromptTabs(snoozedTabs);
   }
 
-  function getTodayStatus(state: NoticeStorageState, now: number): NoticeTodayStatus {
+  function getTodayStatus(state: FerbToolsStorageState, now: number): NoticeTodayStatus {
     const dayKey: string = getDayKey(now);
-    const record: NoticeDailyRecord | undefined = state.records[dayKey];
+    const record: NoticeDailyRecord | undefined = state.features.checkIn.records[dayKey];
 
     return {
       dayKey,
@@ -600,14 +601,14 @@ namespace NoticeCheckInBackground {
   }
 
   async function refreshActionBadge(): Promise<void> {
-    const state: NoticeStorageState = await initializeState();
+    const state: FerbToolsStorageState = await initializeState();
     const badgeState: NoticeBadgeState = getBadgeState(state, Date.now());
 
     await Promise.all([chrome.action.setBadgeText({ text: badgeState.text }), chrome.action.setBadgeBackgroundColor({ color: badgeState.backgroundColor }), chrome.action.setBadgeTextColor({ color: BADGE_TEXT_COLOR }), chrome.action.setTitle({ title: badgeState.title })]);
   }
 
-  function getBadgeState(state: NoticeStorageState, now: number): NoticeBadgeState {
-    if (!state.settings.enabled) {
+  function getBadgeState(state: FerbToolsStorageState, now: number): NoticeBadgeState {
+    if (!state.features.checkIn.settings.enabled) {
       return {
         text: 'OFF',
         backgroundColor: BADGE_DISABLED_COLOR,
@@ -627,7 +628,7 @@ namespace NoticeCheckInBackground {
       };
     }
 
-    const todayRecord: NoticeDailyRecord | undefined = state.records[getDayKey(now)];
+    const todayRecord: NoticeDailyRecord | undefined = state.features.checkIn.records[getDayKey(now)];
 
     if (todayRecord?.checkInAt && todayRecord.checkoutReminderDueAt && todayRecord.checkoutReminderDueAt <= now) {
       return {
@@ -637,7 +638,7 @@ namespace NoticeCheckInBackground {
       };
     }
 
-    const lateSuffix: string = isLateCheckInTime(now, state.settings) ? ` ${LATE_CHECKIN_MESSAGE}` : '';
+    const lateSuffix: string = isLateCheckInTime(now, state.features.checkIn.settings) ? ` ${LATE_CHECKIN_MESSAGE}` : '';
 
   return {
     text: 'IN?',
@@ -689,7 +690,7 @@ namespace NoticeCheckInBackground {
       chrome.scripting.executeScript(
         {
           target: { tabId },
-          files: ['content.js'],
+          files: ['features/check-in/content.js'],
         },
         (): void => {
           if (chrome.runtime.lastError) {
@@ -729,12 +730,12 @@ namespace NoticeCheckInBackground {
     return dayKey || null;
   }
 
-  function pruneState(state: NoticeStorageState, now: number): { state: NoticeStorageState; changed: boolean } {
+  function pruneState(state: FerbToolsStorageState, now: number): { state: FerbToolsStorageState; changed: boolean } {
     const cutoffDayKey: string = getDayKey(now - RECORD_RETENTION_DAYS * DAY_MS);
     const nextRecords: Record<string, NoticeDailyRecord> = {};
     let changed: boolean = false;
 
-    Object.entries(state.records).forEach(([dayKey, record]: [string, NoticeDailyRecord]): void => {
+    Object.entries(state.features.checkIn.records).forEach(([dayKey, record]: [string, NoticeDailyRecord]): void => {
       if (dayKey >= cutoffDayKey) {
         nextRecords[dayKey] = record;
         return;
@@ -746,8 +747,12 @@ namespace NoticeCheckInBackground {
     return {
       state: {
         version: 1,
-        records: nextRecords,
-        settings: state.settings,
+        features: {
+          checkIn: {
+            records: nextRecords,
+            settings: state.features.checkIn.settings,
+          },
+        },
       },
       changed,
     };
@@ -890,21 +895,21 @@ function withExtensionCredit(message: string): string {
     return typeof value === 'object' && value !== null;
   }
 
-  async function getStorageState(): Promise<NoticeStorageState> {
-    return new Promise((resolve: (value: NoticeStorageState) => void): void => {
-      chrome.storage.local.get(STORAGE_KEY, (items: Record<string, unknown>): void => {
+  async function getStorageState(): Promise<FerbToolsStorageState> {
+    return new Promise((resolve: (value: FerbToolsStorageState) => void): void => {
+      chrome.storage.local.get([STORAGE_KEY, LEGACY_CHECK_IN_STORAGE_KEY], (items: Record<string, unknown>): void => {
         if (chrome.runtime.lastError) {
           console.error('Failed to read extension state', chrome.runtime.lastError);
           resolve(createEmptyState());
           return;
         }
 
-        resolve(normalizeState(items[STORAGE_KEY]));
+        resolve(normalizeState(items[STORAGE_KEY] ?? items[LEGACY_CHECK_IN_STORAGE_KEY]));
       });
     });
   }
 
-  async function saveStorageState(state: NoticeStorageState): Promise<void> {
+  async function saveStorageState(state: FerbToolsStorageState): Promise<void> {
     return new Promise((resolve: () => void, reject: (reason?: unknown) => void): void => {
       chrome.storage.local.set(
         {
@@ -1002,22 +1007,64 @@ function withExtensionCredit(message: string): string {
     });
   }
 
-  function createEmptyState(): NoticeStorageState {
+  function createEmptyState(): FerbToolsStorageState {
     return {
       version: 1,
-      records: {},
-      settings: DEFAULT_SETTINGS,
+      features: {
+        checkIn: {
+          records: {},
+          settings: DEFAULT_SETTINGS,
+        },
+      },
     };
   }
 
-  function normalizeState(candidate: unknown): NoticeStorageState {
-    if (!isRecord(candidate) || candidate.version !== 1 || !isRecord(candidate.records)) {
+  function normalizeState(candidate: unknown): FerbToolsStorageState {
+    if (!isRecord(candidate) || candidate.version !== 1) {
       return createEmptyState();
     }
 
+    if (isRecord(candidate.features) && isRecord(candidate.features.checkIn)) {
+      return {
+        version: 1,
+        features: {
+          checkIn: normalizeCheckInFeatureState(candidate.features.checkIn),
+        },
+      };
+    }
+
+    if (isRecord(candidate.records)) {
+      return {
+        version: 1,
+        features: {
+          checkIn: normalizeCheckInFeatureState(candidate),
+        },
+      };
+    }
+
+    return createEmptyState();
+  }
+
+  function normalizeCheckInFeatureState(candidate: unknown): NoticeCheckInFeatureState {
+    if (!isRecord(candidate) || !isRecord(candidate.records)) {
+      return {
+        records: {},
+        settings: DEFAULT_SETTINGS,
+      };
+    }
+
+    const records: Record<string, NoticeDailyRecord> = normalizeRecords(candidate.records);
+
+    return {
+      records,
+      settings: normalizeSettings(candidate.settings),
+    };
+  }
+
+  function normalizeRecords(candidate: Record<string, unknown>): Record<string, NoticeDailyRecord> {
     const records: Record<string, NoticeDailyRecord> = {};
 
-    Object.entries(candidate.records).forEach(([dayKey, value]: [string, unknown]): void => {
+    Object.entries(candidate).forEach(([dayKey, value]: [string, unknown]): void => {
       const normalizedRecord: NoticeDailyRecord | null = normalizeRecord(dayKey, value);
 
       if (normalizedRecord) {
@@ -1025,11 +1072,7 @@ function withExtensionCredit(message: string): string {
       }
     });
 
-    return {
-      version: 1,
-      records,
-      settings: normalizeSettings(candidate.settings),
-    };
+    return records;
   }
 
   function normalizeSettings(candidate: unknown): NoticeSettings {

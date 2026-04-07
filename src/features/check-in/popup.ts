@@ -1,4 +1,4 @@
-namespace NoticeCheckInPopup {
+namespace FerbToolsCheckInPopup {
   const form: HTMLFormElement = getElementById('settings-form', HTMLFormElement);
   const enabledInput: HTMLInputElement = getElementById('enabled', HTMLInputElement);
   const latestCheckInTimeInput: HTMLInputElement = getElementById('latest-checkin-time', HTMLInputElement);
@@ -91,7 +91,7 @@ namespace NoticeCheckInPopup {
   }
 
   async function saveEnabledSetting(): Promise<void> {
-    setFormBusy(true, enabledInput.checked ? 'Đang bật FerbNotice...' : 'Đang tắt FerbNotice...');
+    setFormBusy(true, enabledInput.checked ? 'Đang bật FerbTools...' : 'Đang tắt FerbTools...');
 
     try {
       const response: NoticeSettingsResponse = await sendRuntimeMessage<NoticeUpdateSettingsMessage, NoticeSettingsResponse>({
@@ -102,14 +102,14 @@ namespace NoticeCheckInPopup {
       });
 
       if (!response.success || !response.settings) {
-        throw new Error(response.error ?? 'Không cập nhật được trạng thái FerbNotice.');
+        throw new Error(response.error ?? 'Không cập nhật được trạng thái FerbTools.');
       }
 
       renderSettings(response.settings);
       renderToday(response.today);
-      setStatus(response.settings.enabled ? 'FerbNotice đã bật.' : 'FerbNotice đã tắt.');
+      setStatus(response.settings.enabled ? 'FerbTools đã bật.' : 'FerbTools đã tắt.');
     } catch (error: unknown) {
-      setStatus(error instanceof Error ? error.message : 'Không cập nhật được trạng thái FerbNotice.');
+      setStatus(error instanceof Error ? error.message : 'Không cập nhật được trạng thái FerbTools.');
       await loadSettings();
     } finally {
       setFormBusy(false);

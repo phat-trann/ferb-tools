@@ -13,10 +13,16 @@ interface NoticeSettings {
   roundingSlotMinutes: number;
 }
 
-interface NoticeStorageState {
-  version: 1;
+interface NoticeCheckInFeatureState {
   records: Record<string, NoticeDailyRecord>;
   settings: NoticeSettings;
+}
+
+interface FerbToolsStorageState {
+  version: 1;
+  features: {
+    checkIn: NoticeCheckInFeatureState;
+  };
 }
 
 interface NoticeTodayStatus {

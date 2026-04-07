@@ -5,10 +5,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description"
-    content="FerbNotice is a Chrome MV3 extension that reminds you to check in and check out. Made by Ferb.">
-  <link rel="icon" type="image/png" sizes="128x128" href="./assets/logo.png">
-  <link rel="apple-touch-icon" href="./assets/logo.png">
-  <title>FerbNotice - Chrome Check-in Reminder</title>
+    content="FerbTools is a Chrome MV3 extension toolkit. Current tool: check-in and checkout reminders. Made by Ferb.">
+  <link rel="icon" type="image/png" sizes="128x128" href="./assets/icon-128.png">
+  <link rel="apple-touch-icon" href="./assets/icon-128.png">
+  <title>FerbTools - Chrome Extension Toolkit</title>
   <style>
     :root {
       color: #13231e;
@@ -338,11 +338,11 @@
 <body>
   <main class="page">
     <nav class="nav" aria-label="Primary navigation">
-      <a class="brand" href="#top" aria-label="FerbNotice home">
+      <a class="brand" href="#top" aria-label="FerbTools home">
         <span class="brand-mark">
-          <img src="./assets/logo.png" width="44" height="44" alt="" aria-hidden="true">
+          <img src="./assets/icon-128.png" width="44" height="44" alt="" aria-hidden="true">
         </span>
-        <span>FerbNotice</span>
+        <span>FerbTools</span>
       </a>
       <div class="nav-links">
         <a href="https://github.com/phat-trann/ferb-notice" rel="noreferrer" target="_blank"
@@ -358,17 +358,18 @@
         <a href="https://github.com/phat-trann/ferb-notice/releases" rel="noreferrer" target="_blank">Releases</a>
         <a href="#features">Features</a>
         <a href="#install">Install</a>
-        <a href="./ai-data-contract.md">AI Contract</a>
+        <a href="./architecture.md">Architecture</a>
+        <a href="./features/check-in-data-contract.md">AI Contract</a>
       </div>
     </nav>
 
     <section id="top" class="hero">
       <div>
-        <p class="eyebrow">Chrome MV3 extension</p>
+        <p class="eyebrow">Chrome MV3 toolkit</p>
         <h1>Check in, work enough, check out.</h1>
         <p class="lead">
-          FerbNotice reminds you to check in once per day, tracks your configured work duration, and shows the checkout
-          reminder exactly when your rounded work window is complete.
+          FerbTools is a Chrome extension toolkit. Its first tool reminds you to check in once per day, tracks your
+          configured work duration, and shows the checkout reminder when your rounded work window is complete.
         </p>
         <div class="actions">
           <a class="button primary" href="https://github.com/phat-trann/ferb-notice/releases" rel="noreferrer"
@@ -386,7 +387,7 @@
         </div>
       </div>
 
-      <aside class="product-card" aria-label="FerbNotice status preview">
+      <aside class="product-card" aria-label="FerbTools status preview">
         <div class="badge-row">
           <span class="status-badge off">OFF</span>
           <span class="status-badge pending">IN?</span>
@@ -416,7 +417,7 @@
 
     <section id="features" class="section">
       <p class="eyebrow">Why it exists</p>
-      <h2>A small extension for one daily workflow.</h2>
+      <h2>A toolkit starting with one daily workflow.</h2>
       <div class="grid">
         <article class="card">
           <h3>Daily reminder</h3>
@@ -430,7 +431,7 @@
         </article>
         <article class="card">
           <h3>Manual correction</h3>
-          <p>If the browser opens late, correct or clear today's recorded check-in data and FerbNotice recomputes the
+          <p>If the browser opens late, correct or clear today's recorded check-in data and FerbTools recomputes the
             due time
             and badge state.</p>
         </article>
@@ -450,7 +451,7 @@
         <article class="step">
           <span class="step-number">2</span>
           <h3>Download package</h3>
-          <p>Download <code>ferbnotice-production.zip</code> from the latest release.</p>
+          <p>Download <code>ferbtools-production.zip</code> from the latest release.</p>
         </article>
         <article class="step">
           <span class="step-number">3</span>
@@ -467,7 +468,7 @@
     </section>
 
     <footer class="footer">
-      FerbNotice. Made by Ferb.
+      FerbTools. Made by Ferb.
     </footer>
   </main>
 </body>

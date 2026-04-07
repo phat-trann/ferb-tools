@@ -1,5 +1,5 @@
-namespace NoticeCheckInContent {
-  const WINDOW_FLAG = "__noticeCheckInExtensionBootstrapped__";
+namespace FerbToolsCheckInContent {
+  const WINDOW_FLAG = "__ferbToolsCheckInContentBootstrapped__";
 
   interface NoticeContentElements {
     host: HTMLDivElement;
@@ -23,7 +23,7 @@ namespace NoticeCheckInContent {
   }
 
   interface NoticeContentWindow extends Window {
-    __noticeCheckInExtensionBootstrapped__?: boolean;
+    __ferbToolsCheckInContentBootstrapped__?: boolean;
   }
 
   bootstrapContentScript();
@@ -291,7 +291,7 @@ function createNoticeElements(state: NoticeContentState): NoticeContentElements 
   checkInTimeHint.className = "notice-time-hint";
   meta.className = "notice-meta";
   credit.className = "notice-credit";
-  credit.textContent = "FerbNotice • Made by Ferb";
+  credit.textContent = "FerbTools • Made by Ferb";
   actionRow.className = "notice-actions";
   secondaryButton.className = "notice-button notice-button-secondary";
   secondaryButton.type = "button";

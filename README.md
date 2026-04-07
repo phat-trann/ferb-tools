@@ -1,36 +1,34 @@
-# FerbNotice
+# FerbTools
 
-FerbNotice is a Chrome MV3 extension that reminds the user to check in on the first eligible active tab of each local day, then reminds them to check out after the configured work duration.
+FerbTools is a Chrome Manifest V3 extension toolkit. The first tool in the toolkit is the check-in/check-out reminder that asks for a daily check-in, tracks the configured work duration, and reminds the user to check out when the rounded work window is complete.
 
 Made by Ferb.
 
-## Overview
+## Current Tool: Check-In Reminder
 
-FerbNotice is designed for a lightweight daily work-time reminder flow:
+- Shows a daily check-in reminder on the first eligible active Chrome tab.
+- Allows the check-in time to be corrected directly in the injected reminder.
+- Stores runtime state in `chrome.storage.local`.
+- Computes checkout due time from the configured work duration.
+- Rounds checkout due time upward by the configured rounding slot.
+- Shows a checkout reminder when the due time is reached.
+- Shows extension action badge states: `OFF`, `IN?`, countdown, and `OUT`.
+- Supports one-hour per-tab snooze when the user closes or postpones the check-in reminder.
+- Provides an action setup popup to enable/disable the tool, update schedule settings, edit today's check-in time, and clear today's data.
 
-- Ask the user whether they have checked in when they first activate an eligible Chrome tab each day.
-- Store the check-in timestamp in `chrome.storage.local`.
-- Compute the checkout reminder from the configured work duration.
-- Round the checkout reminder upward by the configured rounding slot.
-- Show a checkout reminder when the work duration is complete.
-- Show action badge status directly on the extension icon.
-- Let the user correct today's check-in time manually from the extension popup.
+## Extensible Direction
 
-## Features
+FerbTools is structured so future tools can be added without mixing all logic into the root files:
 
-- Daily check-in prompt based on the local system date.
-- Checkout reminder after the configured work duration.
-- Configurable latest on-time check-in threshold.
-- Configurable work duration.
-- Configurable checkout rounding slot.
-- Manual correction for today's recorded check-in time.
-- Action badge states:
-  - `OFF` with a gray badge when reminders are disabled
-  - `IN?` with a red badge when today's check-in is still missing
-  - a countdown such as `8h` or `42m` with an amber badge while the work window is still running
-  - `OUT` with a green badge when today's configured work duration is complete
-- Setup popup opened by clicking the extension icon.
-- TypeScript source with strict type checking.
+- App orchestration lives in `src/app`.
+- Feature-specific extension code lives in `src/features/<feature-name>`.
+- Shared TypeScript contracts live in `src/shared`.
+- Static extension pages live in `static/pages`.
+- Shared extension assets live in `static/icons`.
+- GitHub Pages content lives in `docs`.
+- Feature docs and data contracts live in `docs/features`.
+
+For the current check-in tool, use `check-in` as the feature key in folder names and `features.checkIn` as the persisted state namespace.
 
 ## Requirements
 
@@ -86,16 +84,16 @@ npm run pack:production
 This creates:
 
 ```text
-ferbnotice-production.zip
+ferbtools-production.zip
 ```
 
 The zip contains the generated extension files from `dist`, including:
 
 - `manifest.json`
-- `background.js`
-- `content.js`
-- `popup.js`
-- `popup.html`
+- `app/background.js`
+- `features/check-in/content.js`
+- `features/check-in/popup.js`
+- `pages/popup.html`
 - `icons/*`
 
 ## GitHub Pages
@@ -111,27 +109,27 @@ To publish it with GitHub Pages:
 5. Select the `/docs` folder.
 6. Save the Pages configuration.
 
-GitHub Pages will serve `docs/index.html` as the site entry point. The AI data contract remains available as `docs/ai-data-contract.md`.
+GitHub Pages will serve `docs/index.html` as the site entry point. The check-in data contract is available at `docs/features/check-in-data-contract.md`, and the extension architecture notes are available at `docs/architecture.md`.
 
 ## Load The Production Build In Chrome
 
-1. Open `chrome://extensions`
-2. Enable `Developer mode`
-3. Select `Load unpacked`
-4. Choose the `dist` directory
-5. Pin `FerbNotice` to the Chrome toolbar
-6. Click the extension icon to open the setup popup
+1. Open `chrome://extensions`.
+2. Enable `Developer mode`.
+3. Select `Load unpacked`.
+4. Choose the `dist` directory.
+5. Pin `FerbTools` to the Chrome toolbar.
+6. Click the extension icon to open the setup popup.
 
 ## Behavior
 
 - The first eligible tab activation each local day triggers the check-in reminder modal.
-- Before a new FerbNotice modal opens, the content script removes any existing FerbNotice modal in the current tab.
+- Before a new FerbTools modal opens, the content script removes any existing FerbTools modal in the current tab.
 - The daily check-in modal includes an editable check-in time. If the user does not edit it, the extension stores the current click timestamp in `chrome.storage.local`; if the user edits it, the extension stores the manual local time.
-- If the user clicks the secondary button, close button, or backdrop on the check-in modal, FerbNotice snoozes that tab for one hour before showing the check-in prompt again.
+- If the user clicks the secondary button, close button, or backdrop on the check-in modal, FerbTools snoozes that tab for one hour before showing the check-in prompt again.
 - If Chrome or the computer opens late and the stored check-in time is wrong, the user can correct today's check-in time in the setup popup.
-- When today's check-in time is corrected, FerbNotice recomputes the checkout due time, alarm, and action badge.
+- When today's check-in time is corrected, FerbTools recomputes the checkout due time, alarm, and action badge.
 - The setup popup can clear today's stored data, which resets today's check-in state and clears today's checkout alarm.
-- If the user checks in later than the configured latest on-time check-in threshold, the injected modal shows the late warning copy defined by `LATE_CHECKIN_MESSAGE` in `src/background.ts`.
+- If the user checks in later than the configured latest on-time check-in threshold, the injected modal shows the late warning copy defined by `LATE_CHECKIN_MESSAGE` in `src/app/background.ts`.
 - After the configured work duration, the checkout time is rounded upward by the configured rounding slot. With the default 30-minute slot:
   - `09:00` stays `09:00`
   - `09:01` through `09:30` becomes `09:30`
@@ -149,30 +147,54 @@ chrome.storage.local
 Root key:
 
 ```text
-noticeCheckInState
+ferbToolsState
 ```
 
-See `docs/ai-data-contract.md` for the full storage schema, derived state, and runtime message contracts.
+The check-in tool stores its feature state under:
+
+```text
+ferbToolsState.features.checkIn
+```
+
+The background service worker still reads the old `noticeCheckInState` key as a legacy migration fallback, then writes future normalized state updates to `ferbToolsState`.
+
+See `docs/features/check-in-data-contract.md` for the full storage schema, derived state, and runtime message contracts.
 
 ## Project Structure
 
-- `src/background.ts`: service worker that manages state, alarms, tab activation, runtime messages, and badge state
-- `src/content.ts`: injected modal UI for check-in and checkout reminders
-- `src/popup.ts`: setup popup controller for settings and manual check-in correction
-- `src/types.d.ts`: shared runtime contracts
-- `static/manifest.json`: Chrome MV3 manifest
-- `static/popup.html`: setup popup document and styles
-- `static/icons/*`: extension icon assets
-- `docs/index.html`: GitHub Pages landing page
-- `docs/ai-data-contract.md`: storage schema, message flow, and derived rules for future AI agents
-- `dist`: generated build output
+```text
+src/
+  app/
+    background.ts
+  features/
+    check-in/
+      content.ts
+      popup.ts
+  shared/
+    types.d.ts
+static/
+  icons/
+  pages/
+    popup.html
+  manifest.json
+docs/
+  assets/
+  features/
+    check-in-data-contract.md
+  architecture.md
+  index.html
+dist/
+  generated build output
+```
 
 ## AI Agent Notes
 
-- Start with `docs/ai-data-contract.md` to understand persisted state, derived state, and message contracts.
-- Reminder scheduling, storage normalization, action badge state, and manual check-in correction are implemented in `src/background.ts`.
-- The tab-injected reminder UI is implemented in `src/content.ts`.
-- The extension action setup popup is implemented in `static/popup.html` and `src/popup.ts`.
+- Start with `docs/architecture.md` for the FerbTools extension layout and expansion rules.
+- Read `docs/features/check-in-data-contract.md` for persisted check-in state, derived state, and message contracts.
+- Reminder scheduling, storage normalization, action badge state, and manual check-in correction are implemented in `src/app/background.ts`.
+- The tab-injected reminder UI is implemented in `src/features/check-in/content.ts`.
+- The extension action setup popup behavior is implemented in `src/features/check-in/popup.ts`.
+- The extension action setup popup markup and styles are implemented in `static/pages/popup.html`.
 - The GitHub Pages landing page is implemented in `docs/index.html`.
 - Build output is generated into `dist`; do not edit `dist` directly unless intentionally patching built artifacts.
 
@@ -182,4 +204,4 @@ See `docs/ai-data-contract.md` for the full storage schema, derived state, and r
 2. Run `npm run build:production`.
 3. Load `dist` into Chrome and smoke test the setup popup.
 4. Run `npm run pack:production`.
-5. Attach `ferbnotice-production.zip` to the GitHub release.
+5. Attach `ferbtools-production.zip` to the GitHub release.

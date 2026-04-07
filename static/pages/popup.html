@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>FerbNotice Setup</title>
+    <title>FerbTools Setup</title>
     <style>
       :root {
         color: #102019;
@@ -68,8 +68,6 @@
       .brand-logo {
         width: 42px;
         height: 42px;
-        border-radius: 14px;
-        box-shadow: 0 14px 30px rgba(15, 118, 110, 0.2);
       }
 
       .eyebrow {
@@ -101,6 +99,8 @@
         position: relative;
         display: inline-flex;
         align-items: center;
+        z-index: 2;
+        cursor: pointer;
       }
 
       .switch input {
@@ -237,17 +237,17 @@
   </head>
   <body>
     <main class="shell">
-      <section class="panel" aria-label="FerbNotice setup">
+      <section class="panel" aria-label="FerbTools setup">
         <div class="brand">
           <div class="brand-copy">
-            <img class="brand-logo" src="icons/icon-128.png" width="42" height="42" alt="" aria-hidden="true">
+            <img class="brand-logo" src="../icons/icon-128.png" width="42" height="42" alt="" aria-hidden="true">
             <div>
               <p class="eyebrow">Setup</p>
-              <h1>FerbNotice</h1>
+              <h1>FerbTools</h1>
               <p class="credit">Made by Ferb</p>
             </div>
           </div>
-          <label class="switch" title="Bật hoặc tắt FerbNotice">
+          <label class="switch" title="Bật hoặc tắt FerbTools">
             <input id="enabled" type="checkbox">
             <span aria-hidden="true"></span>
           </label>
@@ -292,6 +292,6 @@
       </section>
     </main>
 
-    <script src="popup.js"></script>
+    <script src="../features/check-in/popup.js"></script>
   </body>
 </html>
