@@ -1,5 +1,5 @@
 (() => {
-  const bmUrl = {
+  const bmUrls = {
     libraries: '/on/demandware.store/Sites-Site/default/ViewContentSharedLibrary-List?SelectedMenuItem=content&CurrentMenuItemId=content',
   };
 
@@ -18,7 +18,21 @@
     template: 'template',
   };
 
-  const wrappers = {
+  const siteIdByName = {
+    'TUMI Australia': 'Tumi_AU',
+    'TUMI Hong Kong': 'Tumi_HK',
+    'TUMI Indonesia': 'Tumi_ID',
+    'TUMI Japan': 'Tumi_JP',
+    'TUMI Korea': 'Tumi_KR',
+    'TUMI Malaysia': 'Tumi_MY',
+    'TUMI Singapore': 'Tumi_SG',
+    'TUMI Thailand': 'Tumi_TH',
+    'TUMI Taiwan': 'Tumi_TW',
+  };
+
+  const allowedLocales = ['default', 'zh_HK', 'zh_TW', 'en_AU', 'en_HK', 'en_ID', 'en_MY', 'en_SG', 'en_TH', 'in_ID', 'ja_JP', 'ko_KR', 'th_TH'];
+
+  const xmlWrappers = {
     page: { opening: '<page-attributes>', closing: '</page-attributes>' },
     custom: { opening: '        <custom-attributes>\n', closing: '        </custom-attributes>\n' },
     folder: { opening: '<folder-links>', closing: '</folder-links>' },
@@ -36,31 +50,117 @@
 
   const renderers = {
     cleanup(items) {
-      return items.filter((item) => item.values.filter((v) => v !== '' && v !== '_NONE_').length > 0);
+      return items.filter((item) => {
+        if (item.siteSpecificUrl) return true;
+        return item.values.filter((v) => v !== '' && v !== '_NONE_').length > 0;
+      });
     },
 
-    generic(items) {
-      return renderers
-        .cleanup(items)
-        .map((item) => {
+    async getDataBySite(url, openingTag, closingTag, formatValues) {
+      let siteSpecificXml = '';
+      const html = await fetch(url, { credentials: 'include' }).then((res) => res.text());
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const uncheckedInputs = doc.querySelectorAll('input[type="checkbox"]:not(:checked)');
+
+      uncheckedInputs.forEach((input) => {
+        const inputTable = input.closest('table');
+        const wrapperContainer = inputTable ? inputTable.closest('tr')?.closest('table')?.closest('tr') : null;
+        if (!wrapperContainer) {
+          return;
+        }
+
+        const siteDetail = wrapperContainer.querySelector('.table_detail');
+        const containerNode = wrapperContainer.querySelector('.table_detail[id$="_Container"]');
+        if (!siteDetail || !containerNode) {
+          return;
+        }
+
+        const siteName = siteDetail.innerText.trim().split(':')[0];
+        const siteId = siteIdByName[siteName];
+
+        if (siteId) {
+          const containerId = containerNode.id.split('_Container')[0];
+          const siteValues = Array.from(wrapperContainer.querySelectorAll(`[name=${containerId}]`)).map((input) =>
+            input.value
+              .replace(/&/gi, '&amp;')
+              .replace(/</gi, '&lt;')
+              .replace(/\r\n|\r|\n/g, '&#13;\n')
+              .replace(/>/gi, '&gt;')
+          );
+          const effectiveValues = siteValues.filter((value) => value !== '' && value !== '_NONE_');
+          if (effectiveValues.length === 0) {
+            return;
+          }
+
+          const renderedValue = formatValues ? formatValues(effectiveValues) : effectiveValues[0];
+          if (renderedValue === '' || renderedValue === '_NONE_') {
+            return;
+          }
+
+          siteSpecificXml += `${openingTag.replace('###', siteId)}${renderedValue}${closingTag}\n`;
+        }
+      });
+
+      return siteSpecificXml;
+    },
+
+    async generic(items) {
+      const chunks = await Promise.all(
+        renderers.cleanup(items).map(async (item) => {
+          if (item.siteSpecificUrl) {
+            let defaultXml = item.values[0] !== '' && item.values[0] !== '_NONE_' ? `        <${fieldTagMap[item.id]}>${item.values[0]}</${fieldTagMap[item.id]}>\n` : '';
+            const siteSpecificText = await renderers.getDataBySite(item.siteSpecificUrl, `        <${fieldTagMap[item.id]} site-id="###">`, `</${fieldTagMap[item.id]}>`);
+
+            return defaultXml + siteSpecificText;
+          }
+
           return `        <${fieldTagMap[item.id]}${item.isLocalized ? ` xml:lang="${item.lang}">` : '>'}${item.values[0]}</${fieldTagMap[item.id]}>\n`;
         })
-        .join('');
+      );
+
+      return chunks.join('');
     },
 
-    page(items) {
+    async page(items) {
       return renderers.generic(items);
     },
 
-    custom(items) {
-      return renderers
-        .cleanup(items)
-        .map((item) => {
-          const value = item.values.length === 1 ? item.values[0] : item.values.map((v) => `<value>${v}</value>`).join('');
+    async custom(items) {
+      const chunks = await Promise.all(
+        renderers.cleanup(items).map(async (item) => {
+          const effectiveValues = item.values.filter((v) => v !== '' && v !== '_NONE_');
+          const value =
+            effectiveValues.length <= 1
+              ? effectiveValues[0] || ''
+              : '\n' +
+                effectiveValues
+                  .map((v) => `<value>${v}</value>`)
+                  .map((v) => '                ' + v)
+                  .join('\n') +
+                '\n            ';
 
-          return `            <custom-attribute attribute-id="${item.id}${item.isLocalized ? `" xml:lang="${item.lang}">` : '">'}${value}</custom-attribute>\n`;
+          if (item.siteSpecificUrl) {
+            const hasDefaultValue = effectiveValues.length > 0;
+            const defaultXml = hasDefaultValue ? `            <custom-attribute attribute-id="${item.id}">${value}</custom-attribute>\n` : '';
+            const siteSpecificText = await renderers.getDataBySite(item.siteSpecificUrl, `            <custom-attribute site-id="###" attribute-id="${item.id}">`, `</custom-attribute>`, function (values) {
+              return values.length === 1
+                ? values[0]
+                : '\n' +
+                    values
+                      .map((v) => `<value>${v}</value>`)
+                      .map((v) => '                ' + v)
+                      .join('\n') +
+                    '\n            ';
+            });
+
+            return defaultXml + siteSpecificText;
+          }
+
+          return effectiveValues.length > 0 ? `            <custom-attribute attribute-id="${item.id}${item.isLocalized ? `" xml:lang="${item.lang}">` : '">'}${value}</custom-attribute>\n` : '';
         })
-        .join('');
+      );
+
+      return chunks.join('');
     },
 
     folder(items) {
@@ -71,7 +171,7 @@
         .join('');
     },
 
-    sitemap(items) {
+    async sitemap(items) {
       return renderers.generic(items);
     },
   };
@@ -126,27 +226,35 @@
 
   function fetchLibraryInfo() {
     const selected = document.getElementsByClassName('sod_option selected active ');
-    let repositoryUUID = null;
+    let repositoryUuid = null;
 
-    repositoryUUID = selected.length ? selected[0].innerText : null;
+    repositoryUuid = selected.length ? selected[0].innerText : null;
 
     if (isModernBmUi()) {
-      repositoryUUID = getMerchantToolsSelectedSiteName();
+      repositoryUuid = getMerchantToolsSelectedSiteName();
     }
 
     let result = {};
 
     return new Promise((resolve) => {
       const csrfToken = getParameterByName('csrf_token', window.location.href);
-      const url = new URL(`${window.location.origin}${bmUrl.libraries}`);
+      const url = new URL(`${window.location.origin}${bmUrls.libraries}`);
 
-      url.searchParams.set('RepositoryUUID', repositoryUUID);
+      url.searchParams.set('RepositoryUUID', repositoryUuid);
       url.searchParams.set('csrf_token', csrfToken);
 
       fetch(url.toString(), { credentials: 'include' })
         .then((res) => res.text())
         .then((html) => {
-          const rowChildren = [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('.table_detail:not(.bold)')].find((node) => node.innerHTML.includes(repositoryUUID)).parentNode.children;
+          const detailNodes = [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('.table_detail:not(.bold)')];
+          const selectedNode = detailNodes.find((node) => node.innerHTML.includes(repositoryUuid));
+
+          if (!selectedNode || !selectedNode.parentNode || !selectedNode.parentNode.children) {
+            resolve({ shared: false });
+            return;
+          }
+
+          const rowChildren = selectedNode.parentNode.children;
 
           result =
             rowChildren[1].innerText.indexOf('Shared') > -1
@@ -171,13 +279,16 @@
     return !!(firstCell.hasAttribute('title') && firstCell.title === 'Site-Specific');
   }
 
-  function renderGroupedXml(groups) {
-    return Object.keys(groups).reduce((result, key) => {
-      const wrapper = wrappers[key];
-      const xml = renderers[key].call(this, groups[key]);
-      const xmlText = xml !== '' ? wrapper.opening + xml + wrapper.closing : '';
-      return result + xmlText;
-    }, '');
+  async function renderGroupedXml(groups) {
+    const chunks = await Promise.all(
+      Object.keys(groups).map(async (key) => {
+        const wrapper = xmlWrappers[key];
+        const xml = await renderers[key].call(this, groups[key]);
+        return xml !== '' ? wrapper.opening + xml + wrapper.closing : '';
+      })
+    );
+
+    return chunks.join('');
   }
 
   function buildContentAsset() {
@@ -185,16 +296,16 @@
     const localeSelect = document.querySelector('[name="LocaleId"]');
     const contentUUID = document.querySelector('[name="ContentUUID"]');
     const localeForm = document.querySelector('form[name="localeForm"]');
-    const localeOptions = [...localeSelect.options];
-    const action = localeForm.action;
+    const localeOptions = [...localeSelect.options].filter((option) => (allowedLocales.length ? allowedLocales.includes(option.value) : true)).sort((a, b) => a.value.localeCompare(b.value));
+    const localeFormAction = localeForm.action;
     const baseQuery = `?&ContentUUID=${contentUUID.value}&switch=switch&LocaleId=`;
 
     let xmlLang;
 
-    const requests = localeOptions.map((option) => fetch(`${action}${baseQuery}${option.value}`, { credentials: 'include' }).then((res) => res.text()));
+    const localeRequests = localeOptions.map((option) => fetch(`${localeFormAction}${baseQuery}${option.value}`, { credentials: 'include' }).then((res) => res.text()));
 
     return new Promise((resolve) => {
-      Promise.all(requests)
+      Promise.all(localeRequests)
         .then((htmlPages) => {
           const parser = new DOMParser();
           const grouped = htmlPages.reduce(
@@ -214,16 +325,27 @@
                     id,
                     lang: xmlLang,
                     isLocalized: isLocalized(node),
-                    isSiteSpecific: isSiteSpecific(node),
                     values: Array.from(doc.querySelectorAll(`[name=Meta${node.dataset.dwAttruuid}]`)).map((input) =>
                       input.value
                         .replace(/&/gi, '&amp;')
-                        .replace(/"/gi, '&quot;')
                         .replace(/</gi, '&lt;')
-                        .replace(/[\r\n]+/gi, '&#13;\n')
+                        .replace(/\r\n|\r|\n/g, '&#13;\n')
                         .replace(/>/gi, '&gt;')
                     ),
                   };
+
+                  if (isSiteSpecific(node)) {
+                    const tableNode = node.closest('table');
+                    const rowNode = tableNode ? tableNode.closest('tr') : null;
+                    const showAllLink = rowNode ? rowNode.querySelector('.ssa_show_all a') : null;
+                    const onclickValue = showAllLink ? showAllLink.getAttribute('onclick') : null;
+                    const urlMatch = onclickValue ? onclickValue.match(/'([^']+)'/) : null;
+                    const url = urlMatch ? urlMatch[1] : null;
+
+                    if (url) {
+                      item.siteSpecificUrl = url;
+                    }
+                  }
 
                   if (!genericFields.includes(id) && !sitemapFields.includes(id) && !pageFields.includes(id) && !hasNonLocalizedItem(acc.custom, id)) {
                     acc.custom.push(item);
@@ -252,18 +374,21 @@
 
           grouped.generic = [...names, ...descriptions, ...rest];
 
-          debugger;
+          Object.keys(grouped).forEach((key) => {
+            grouped[key] = grouped[key].sort((a, b) => a.id.localeCompare(b.id));
+          });
 
           return grouped;
         })
         .then((grouped) => {
-          Promise.all([fetchLibraryInfo(), fetchFolderLinks()]).then((results) => {
+          Promise.all([fetchLibraryInfo(), fetchFolderLinks()]).then(async (results) => {
             const [libraryInfo, folderNodes] = results;
             const foldersXml = renderers.folder(folderNodes);
             const libraryOpen = libraryInfo.shared ? libraryInfo.xml : '<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31">';
             const contentId = document.getElementsByClassName('table_detail')[0].childNodes[1].value;
+            const groupedXml = await renderGroupedXml(grouped);
 
-            const rawXml = ['<?xml version="1.0" encoding="UTF-8"?>\n', libraryOpen, `    <content content-id="${contentId}">\n`, renderGroupedXml(grouped), '        <folder-links>\n', foldersXml + foldersXml ? '\n' : '', '        </folder-links>\n', '    </content>\n', '</library>'].join('');
+            const rawXml = ['<?xml version="1.0" encoding="UTF-8"?>\n', libraryOpen, `    <content content-id="${contentId}">\n`, groupedXml, '        <folder-links>\n', foldersXml !== '' ? `${foldersXml}\n` : '', '        </folder-links>\n', '    </content>\n', '</library>'].join('');
 
             resolve({
               xml: rawXml,
@@ -289,4 +414,6 @@
       console.log('Content asset generated and download initiated.');
     });
   };
+
+  generateContentAsset();
 })();
