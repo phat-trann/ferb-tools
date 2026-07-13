@@ -103,6 +103,16 @@ interface ContentAssetExportProgressMessage {
   label: string;
 }
 
+interface JiraReportGenerateMessage {
+  type: "RUN_JIRA_REPORT_GENERATE_V2";
+}
+
+interface JiraReportResult {
+  workHtml: string;
+  resultHtml: string;
+  warnings: string[];
+}
+
 interface ContentAssetSettings {
   allowedLocales: string[];
   siteIdByName: Record<string, string>;
@@ -151,5 +161,11 @@ interface NoticeCompleteCheckInResponse {
 
 interface ContentAssetExportResponse {
   success: boolean;
+  error?: string;
+}
+
+interface JiraReportResponse {
+  success: boolean;
+  report?: JiraReportResult;
   error?: string;
 }

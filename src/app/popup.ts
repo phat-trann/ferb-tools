@@ -1,5 +1,5 @@
 namespace FerbToolsPopup {
-  const APP_VERSION = '1.9.3';
+  const APP_VERSION = '1.10.2';
 
   document.addEventListener('DOMContentLoaded', (): void => {
     const versionElement: HTMLSpanElement = getElementById('version', HTMLSpanElement);
@@ -41,6 +41,18 @@ namespace FerbToolsPopup {
         listFilenameInput: getElementById('content-asset-list-filename', HTMLInputElement),
         listConcurrencyInput: getElementById('content-asset-list-concurrency', HTMLInputElement),
         listRunButton: getElementById('content-asset-list-button', HTMLButtonElement),
+      },
+    });
+
+    FerbToolsJiraReportPopupFeature.init({
+      setStatus,
+      elements: {
+        section: getElementById('jira-report-section', HTMLDetailsElement),
+        generateButton: getElementById('jira-report-generate-button', HTMLButtonElement),
+        copyWorkButton: getElementById('jira-report-copy-work-button', HTMLButtonElement),
+        copyResultButton: getElementById('jira-report-copy-result-button', HTMLButtonElement),
+        workPreview: getElementById('jira-report-work-preview', HTMLDivElement),
+        resultPreview: getElementById('jira-report-result-preview', HTMLDivElement),
       },
     });
   });

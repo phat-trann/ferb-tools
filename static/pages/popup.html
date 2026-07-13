@@ -266,7 +266,7 @@
         min-height: 0;
         margin-top: 10px;
         overflow-y: auto;
-        padding-right: 4px;
+        padding-left: 4px;
         scrollbar-gutter: stable;
       }
 
@@ -420,7 +420,8 @@
         align-items: center;
         flex: 0 0 24px;
         height: 24px;
-        margin: 8px 0 0;
+        margin: 8px;
+        margin-left: 4px;
         overflow: hidden;
         padding: 0 8px;
         border: 1px solid rgba(14, 165, 233, 0.16);
@@ -439,6 +440,51 @@
         visibility: hidden;
       }
 
+      .report-block {
+        display: grid;
+        gap: 6px;
+      }
+
+      .report-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 11px;
+        font-weight: 900;
+        color: rgba(15, 23, 42, 0.72);
+      }
+
+      .report-copy-button {
+        width: auto;
+        height: 26px;
+        padding: 0 8px;
+        border: 1px solid rgba(37, 99, 235, 0.2);
+        color: #1d4ed8;
+        background: #eff6ff;
+        box-shadow: none;
+        font-size: 10px;
+      }
+
+      .report-preview {
+        min-height: 86px;
+        max-height: 118px;
+        overflow: auto;
+        padding: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.34);
+        border-radius: 8px;
+        background: #ffffff;
+        color: #172033;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.35;
+      }
+
+      .report-preview:empty::before {
+        content: "No data";
+        color: rgba(15, 23, 42, 0.34);
+      }
+
     </style>
   </head>
   <body>
@@ -454,7 +500,7 @@
             </div>
           </div>
           <div class="top-actions">
-            <span id="version" class="version-pill">v1.9.3</span>
+            <span id="version" class="version-pill">v1.10.2</span>
           </div>
         </div>
 
@@ -570,6 +616,34 @@
               </div>
             </div>
           </details>
+
+          <details id="jira-report-section" class="tool-card">
+            <summary class="tool-summary">
+              <div>
+                <h2>Jira Report</h2>
+              </div>
+              <span class="summary-actions">
+                <button id="jira-report-generate-button" class="tool-button" type="button">Generate</button>
+                <span class="expand-pill" aria-hidden="true">›</span>
+              </span>
+            </summary>
+            <div class="tool-setup">
+              <div class="report-block">
+                <div class="report-header">
+                  <span>Work Plan</span>
+                  <button id="jira-report-copy-work-button" class="report-copy-button" type="button">Copy</button>
+                </div>
+                <div id="jira-report-work-preview" class="report-preview" contenteditable="true"></div>
+              </div>
+              <div class="report-block">
+                <div class="report-header">
+                  <span>Result</span>
+                  <button id="jira-report-copy-result-button" class="report-copy-button" type="button">Copy</button>
+                </div>
+                <div id="jira-report-result-preview" class="report-preview" contenteditable="true"></div>
+              </div>
+            </div>
+          </details>
         </section>
 
       </section>
@@ -578,6 +652,7 @@
     <script src="../features/content-asset/config.js"></script>
     <script src="../features/check-in/popup.js"></script>
     <script src="../features/content-asset/popup.js"></script>
+    <script src="../features/jira-report/popup.js"></script>
     <script src="../app/popup.js"></script>
   </body>
 </html>

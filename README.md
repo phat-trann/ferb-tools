@@ -6,10 +6,11 @@ Current tools:
 
 - Check-in Reminder: stores today's check-in time, computes the checkout reminder, rounds the checkout time by the configured slot, and shows action badge status.
 - Content Asset Export: sends a message to `src/features/content-asset/content-asset-export.ts` on the current Business Manager tab.
+- Jira Report: generates Work Plan and Result HTML from the current Jira dashboard for Teams.
 
 ## Version
 
-Current version: `1.9.3`
+Current version: `1.10.2`
 
 Versioning uses semantic versioning:
 
@@ -18,6 +19,18 @@ Versioning uses semantic versioning:
 - Major: breaking storage, package, or workflow change.
 
 ## Version Notes
+
+### 1.10.2
+
+- Fixes Jira Report message response handling and expands the report section when generating.
+
+### 1.10.1
+
+- Uses bullet formatting for Jira Result and keeps the last generated Jira report in the popup.
+
+### 1.10.0
+
+- Added Jira Report in the extension popup with Work Plan/Result preview and copy actions.
 
 ### 1.9.3
 
