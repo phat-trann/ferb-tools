@@ -9,7 +9,7 @@ Current tools:
 
 ## Version
 
-Current version: `1.3.0`
+Current version: `1.5.1`
 
 Versioning uses semantic versioning:
 
@@ -18,6 +18,32 @@ Versioning uses semantic versioning:
 - Major: breaking storage, package, or workflow change.
 
 ## Version Notes
+
+### 1.5.1
+
+- Removed startup setup loading text from the global popup status.
+- Added a runtime message timeout so Check-in setup cannot stay busy forever when background does not respond.
+
+### 1.5.0
+
+- Moved popup orchestration into global `src/app/popup.ts`.
+- Split popup feature helpers into each feature folder.
+- Moved popup status to the top of the panel.
+
+### 1.4.2
+
+- Kept tool setup panels collapsed by default and removed extra popup helper text.
+- Moved Content Asset Export progress detail to console logging while keeping percent progress in the Run button.
+
+### 1.4.1
+
+- Added `npm run watch` for automatic TypeScript and static file rebuilds during extension development.
+
+### 1.4.0
+
+- Moved Check-in Reminder setup into an expandable tool card.
+- Added expandable Content Asset Export setup for locales and site mapping.
+- Content Asset Export now reads saved setup from `chrome.storage.local`.
 
 ### 1.3.0
 
@@ -72,6 +98,14 @@ npm run build
 
 The unpacked extension is generated in `dist`.
 
+## Watch Build
+
+```bash
+npm run watch
+```
+
+The watch command builds once, then keeps TypeScript output and static extension files in `dist` updated while you edit.
+
 ## Production Build
 
 ```bash
@@ -99,8 +133,10 @@ This creates `ferbtools-production.zip`.
 ```text
 src/
   app/background.ts
+  app/popup.ts
   features/content-asset/config.ts
   features/content-asset/content-asset-export.ts
+  features/content-asset/popup.ts
   features/check-in/content.ts
   features/check-in/popup.ts
   shared/types.d.ts

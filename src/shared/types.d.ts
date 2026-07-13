@@ -91,6 +91,11 @@ interface ContentAssetExportProgressMessage {
   label: string;
 }
 
+interface ContentAssetSettings {
+  allowedLocales: string[];
+  siteIdByName: Record<string, string>;
+}
+
 interface NoticeAcknowledgeCheckoutReminderResponse {
   success: boolean;
   error?: string;

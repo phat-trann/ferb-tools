@@ -1,4 +1,5 @@
 namespace FerbToolsContentAssetExport {
+  const CONTENT_ASSET_SETTINGS_STORAGE_KEY = 'ferbToolsContentAssetSettings';
   type ContentAssetGroupKey = 'generic' | 'page' | 'custom' | 'sitemap';
   type XmlWrapperKey = ContentAssetGroupKey | 'folder';
 
@@ -58,6 +59,7 @@ namespace FerbToolsContentAssetExport {
   const PAGE_FIELDS = ['pageTitle', 'pageDescription', 'pageKeywords', 'pageURL'];
   const IGNORED_FIELDS = ['ID'];
   const GROUP_KEYS: ContentAssetGroupKey[] = ['generic', 'page', 'custom', 'sitemap'];
+  let activeSettings: ContentAssetSettings = FerbToolsContentAssetConfig.createDefaultSettings();
 
   const renderers: Record<ContentAssetGroupKey, Renderer> & {
     cleanup: (items: ContentAssetItem[]) => ContentAssetItem[];
@@ -90,7 +92,7 @@ namespace FerbToolsContentAssetExport {
         }
 
         const siteName: string = siteDetail.innerText.trim().split(':')[0];
-        const siteId: string | undefined = FerbToolsContentAssetConfig.SITE_ID_BY_NAME[siteName];
+        const siteId: string | undefined = activeSettings.siteIdByName[siteName];
 
         if (siteId) {
           const containerId: string = containerNode.id.split('_Container')[0];
@@ -124,7 +126,7 @@ namespace FerbToolsContentAssetExport {
             return defaultXml + siteSpecificText;
           }
 
-          return `            <${fieldTag}${item.isLocalized ? ` xml:lang="${item.lang}">` : '>'}${item.values[0]}</${fieldTag}>\n`;
+          return `${item.id !== 'name' ? '    ' : '' }        <${fieldTag}${item.isLocalized ? ` xml:lang="${item.lang}">` : '>'}${item.values[0]}</${fieldTag}>\n`;
         })
       );
 
@@ -213,11 +215,12 @@ namespace FerbToolsContentAssetExport {
   async function buildContentAsset(runId: string): Promise<ContentAssetResult> {
     console.log('Building content asset...');
     reportProgress(runId, 6, 'Reading page setup');
+    activeSettings = await readContentAssetSettings();
     const localeSelect: HTMLSelectElement = requireElement('[name="LocaleId"]', HTMLSelectElement);
     const contentUUID: HTMLInputElement = requireElement('[name="ContentUUID"]', HTMLInputElement);
     const localeForm: HTMLFormElement = requireElement('form[name="localeForm"]', HTMLFormElement);
     const localeOptions: HTMLOptionElement[] = Array.from(localeSelect.options)
-      .filter((option: HTMLOptionElement): boolean => (FerbToolsContentAssetConfig.ALLOWED_LOCALES.length ? FerbToolsContentAssetConfig.ALLOWED_LOCALES.includes(option.value as (typeof FerbToolsContentAssetConfig.ALLOWED_LOCALES)[number]) : true))
+      .filter((option: HTMLOptionElement): boolean => (activeSettings.allowedLocales.length ? activeSettings.allowedLocales.includes(option.value) : true))
       .sort((a: HTMLOptionElement, b: HTMLOptionElement): number => a.value.localeCompare(b.value));
     const localeFormAction: string = localeForm.action;
     const baseQuery = `?&ContentUUID=${contentUUID.value}&switch=switch&LocaleId=`;
@@ -255,6 +258,48 @@ namespace FerbToolsContentAssetExport {
     }
 
     return Math.min(55, 10 + Math.round((completedLocales / totalLocales) * 45));
+  }
+
+  async function readContentAssetSettings(): Promise<ContentAssetSettings> {
+    return new Promise((resolve: (value: ContentAssetSettings) => void): void => {
+      chrome.storage.local.get(CONTENT_ASSET_SETTINGS_STORAGE_KEY, (items: Record<string, unknown>): void => {
+        if (chrome.runtime.lastError) {
+          resolve(FerbToolsContentAssetConfig.createDefaultSettings());
+          return;
+        }
+
+        resolve(normalizeContentAssetSettings(items[CONTENT_ASSET_SETTINGS_STORAGE_KEY]));
+      });
+    });
+  }
+
+  function normalizeContentAssetSettings(candidate: unknown): ContentAssetSettings {
+    const defaults: ContentAssetSettings = FerbToolsContentAssetConfig.createDefaultSettings();
+
+    if (!isRecord(candidate)) {
+      return defaults;
+    }
+
+    return {
+      allowedLocales: Array.isArray(candidate.allowedLocales) ? candidate.allowedLocales.filter((locale: unknown): locale is string => typeof locale === 'string' && locale.trim() !== '') : defaults.allowedLocales,
+      siteIdByName: normalizeSiteIdMap(candidate.siteIdByName, defaults.siteIdByName),
+    };
+  }
+
+  function normalizeSiteIdMap(candidate: unknown, fallback: Record<string, string>): Record<string, string> {
+    if (!isRecord(candidate)) {
+      return fallback;
+    }
+
+    const normalizedMap: Record<string, string> = {};
+
+    Object.entries(candidate).forEach(([siteName, siteId]: [string, unknown]): void => {
+      if (typeof siteId === 'string' && siteName.trim() !== '' && siteId.trim() !== '') {
+        normalizedMap[siteName] = siteId;
+      }
+    });
+
+    return Object.keys(normalizedMap).length ? normalizedMap : fallback;
   }
 
   function buildGroupsFromLocalePages(htmlPages: string[]): ContentAssetGroups {
@@ -513,6 +558,10 @@ namespace FerbToolsContentAssetExport {
 
   function isContentAssetExportMessage(message: unknown): message is ContentAssetExportMessage {
     return typeof message === 'object' && message !== null && (message as Record<string, unknown>).type === 'RUN_CONTENT_ASSET_EXPORT' && typeof (message as Record<string, unknown>).runId === 'string';
+  }
+
+  function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
   }
 
   function reportProgress(runId: string, percent: number, label: string): void {
