@@ -1,5 +1,5 @@
 namespace FerbToolsPopup {
-  const APP_VERSION = '1.10.2';
+  const APP_VERSION = '1.10.4';
 
   document.addEventListener('DOMContentLoaded', (): void => {
     const versionElement: HTMLSpanElement = getElementById('version', HTMLSpanElement);

@@ -10,7 +10,7 @@ Current tools:
 
 ## Version
 
-Current version: `1.10.2`
+Current version: `1.10.4`
 
 Versioning uses semantic versioning:
 
@@ -19,6 +19,14 @@ Versioning uses semantic versioning:
 - Major: breaking storage, package, or workflow change.
 
 ## Version Notes
+
+### 1.10.4
+
+- Standardizes popup color, text, font-size, and button styling.
+
+### 1.10.3
+
+- Aligns popup scrollbars across tool lists, textareas, and Jira report previews.
 
 ### 1.10.2
 

@@ -6,8 +6,34 @@
     <title>FerbTools Setup</title>
     <style>
       :root {
-        color: #172033;
-        background: #eef2f7;
+        --bg: #eef2f7;
+        --surface: #ffffff;
+        --surface-muted: #f8fafc;
+        --surface-soft: #eff6ff;
+        --border: rgba(148, 163, 184, 0.32);
+        --border-strong: rgba(148, 163, 184, 0.42);
+        --text: #172033;
+        --text-strong: #0f172a;
+        --text-muted: rgba(15, 23, 42, 0.62);
+        --primary: #2563eb;
+        --primary-hover: #1d4ed8;
+        --primary-soft: rgba(37, 99, 235, 0.12);
+        --primary-border: rgba(37, 99, 235, 0.22);
+        --success: #0f766e;
+        --danger: #dc2626;
+        --danger-hover: #b91c1c;
+        --info: #075985;
+        --info-surface: #f0f9ff;
+        --info-border: rgba(14, 165, 233, 0.16);
+        --scroll-thumb: rgba(100, 116, 139, 0.34);
+        --shadow-panel: 0 14px 32px rgba(15, 23, 42, 0.12);
+        --shadow-button: 0 8px 16px rgba(37, 99, 235, 0.18);
+        --font-xs: 10px;
+        --font-sm: 11px;
+        --font-md: 12px;
+        --font-lg: 13px;
+        color: var(--text);
+        background: var(--bg);
         font-family: "Noto Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
       }
 
@@ -20,7 +46,7 @@
         height: 560px;
         margin: 0;
         overflow: hidden;
-        background: #eef2f7;
+        background: var(--bg);
       }
 
       .shell {
@@ -34,11 +60,11 @@
         display: flex;
         height: 100%;
         flex-direction: column;
-        border: 1px solid rgba(148, 163, 184, 0.28);
+        border: 1px solid var(--border);
         border-radius: 8px;
         padding: 12px;
-        background: #ffffff;
-        box-shadow: 0 14px 32px rgba(15, 23, 42, 0.12);
+        background: var(--surface);
+        box-shadow: var(--shadow-panel);
       }
 
       .brand {
@@ -64,10 +90,10 @@
 
       .eyebrow {
         margin: 0 0 5px;
-        font-size: 10px;
+        font-size: var(--font-xs);
         font-weight: 800;
         letter-spacing: 0.12em;
-        color: #0f766e;
+        color: var(--primary);
         text-transform: uppercase;
       }
 
@@ -79,9 +105,9 @@
 
       .credit {
         margin: 4px 0 0;
-        font-size: 10px;
+        font-size: var(--font-xs);
         font-weight: 700;
-        color: rgba(15, 23, 42, 0.58);
+        color: var(--text-muted);
         text-transform: uppercase;
         letter-spacing: 0.05em;
       }
@@ -93,11 +119,11 @@
         align-items: center;
         height: 26px;
         padding: 0 10px;
-        border: 1px solid rgba(15, 23, 42, 0.1);
+        border: 1px solid var(--border);
         border-radius: 8px;
-        color: #334155;
-        background: #f8fafc;
-        font-size: 11px;
+        color: var(--text-muted);
+        background: var(--surface-muted);
+        font-size: var(--font-sm);
         font-weight: 800;
       }
 
@@ -142,7 +168,7 @@
         width: 18px;
         height: 18px;
         border-radius: 999px;
-        background: #ffffff;
+        background: var(--surface);
         box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
       }
 
@@ -151,7 +177,7 @@
       }
 
       .switch input:checked + span {
-        background: #0f766e;
+        background: var(--primary);
       }
 
       .switch input:checked + span::after {
@@ -168,9 +194,9 @@
       label {
         display: grid;
         gap: 5px;
-        font-size: 11px;
+        font-size: var(--font-sm);
         font-weight: 800;
-        color: rgba(15, 23, 42, 0.72);
+        color: var(--text-muted);
         letter-spacing: 0.02em;
       }
 
@@ -178,13 +204,13 @@
       select,
       textarea {
         width: 100%;
-        border: 1px solid rgba(148, 163, 184, 0.36);
+        border: 1px solid var(--border-strong);
         border-radius: 8px;
         padding: 0 10px;
-        color: #102019;
-        background: rgba(255, 255, 255, 0.82);
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.88);
         font: inherit;
-        font-size: 13px;
+        font-size: var(--font-lg);
         font-weight: 700;
         outline: none;
       }
@@ -192,8 +218,8 @@
       input:focus,
       select:focus,
       textarea:focus {
-        border-color: #0f766e;
-        box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.14);
+        border-color: var(--primary);
+        box-shadow: 0 0 0 4px var(--primary-soft);
       }
 
       input,
@@ -204,9 +230,17 @@
       textarea {
         min-height: 76px;
         max-height: 116px;
+        overflow: auto;
         padding: 9px 10px;
         line-height: 1.45;
         resize: vertical;
+      }
+
+      .tool-grid,
+      textarea,
+      .report-preview {
+        scrollbar-color: var(--scroll-thumb) transparent;
+        scrollbar-width: thin;
       }
 
       .grid {
@@ -218,14 +252,14 @@
       .divider {
         height: 1px;
         margin: 4px 0;
-        background: linear-gradient(90deg, transparent, rgba(15, 118, 110, 0.28), transparent);
+        background: linear-gradient(90deg, transparent, var(--primary-soft), transparent);
       }
 
       .note {
         margin: -3px 0 0;
         overflow: hidden;
-        color: rgba(15, 23, 42, 0.58);
-        font-size: 10px;
+        color: var(--text-muted);
+        font-size: var(--font-xs);
         font-weight: 700;
         line-height: 1.2;
         text-overflow: ellipsis;
@@ -236,17 +270,17 @@
         height: 38px;
         border: none;
         border-radius: 8px;
-        color: #ffffff;
-        background: #0f766e;
-        box-shadow: 0 10px 20px rgba(15, 118, 110, 0.2);
+        color: var(--surface);
+        background: var(--primary);
+        box-shadow: var(--shadow-button);
         font: inherit;
-        font-size: 12px;
+        font-size: var(--font-md);
         font-weight: 900;
         cursor: pointer;
       }
 
       button:hover:not(:disabled) {
-        filter: brightness(1.04);
+        background: var(--primary-hover);
       }
 
       button:focus-visible,
@@ -270,38 +304,50 @@
         scrollbar-gutter: stable;
       }
 
-      .tool-grid::-webkit-scrollbar {
+      .tool-grid::-webkit-scrollbar,
+      textarea::-webkit-scrollbar,
+      .report-preview::-webkit-scrollbar {
         width: 8px;
+        height: 8px;
       }
 
-      .tool-grid::-webkit-scrollbar-track {
+      .tool-grid::-webkit-scrollbar-track,
+      textarea::-webkit-scrollbar-track,
+      .report-preview::-webkit-scrollbar-track {
         background: transparent;
       }
 
-      .tool-grid::-webkit-scrollbar-thumb {
-        border: 2px solid #ffffff;
+      .tool-grid::-webkit-scrollbar-thumb,
+      textarea::-webkit-scrollbar-thumb,
+      .report-preview::-webkit-scrollbar-thumb {
+        border: 2px solid var(--surface);
         border-radius: 999px;
-        background: rgba(100, 116, 139, 0.34);
+        background: var(--scroll-thumb);
+      }
+
+      textarea::-webkit-scrollbar-thumb,
+      .report-preview::-webkit-scrollbar-thumb {
+        border-color: rgba(255, 255, 255, 0.82);
       }
 
       .tool-card {
         display: block;
         padding: 10px;
-        border: 1px solid rgba(148, 163, 184, 0.26);
+        border: 1px solid var(--border);
         border-radius: 8px;
-        background: #f8fafc;
+        background: var(--surface-muted);
         transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
       }
 
       .tool-card[open] {
-        border-color: rgba(37, 99, 235, 0.22);
-        background: #ffffff;
+        border-color: var(--primary-border);
+        background: var(--surface);
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
       }
 
       .tool-card:not([open]):hover {
-        border-color: rgba(15, 118, 110, 0.28);
-        background: #ffffff;
+        border-color: var(--primary-border);
+        background: var(--surface);
       }
 
       .tool-summary {
@@ -333,7 +379,7 @@
         width: 28px;
         height: 28px;
         border-radius: 8px;
-        color: #334155;
+        color: var(--text-muted);
         background: rgba(226, 232, 240, 0.86);
         font-size: 16px;
         font-weight: 900;
@@ -345,8 +391,8 @@
 
       .tool-card h2 {
         margin: 0;
-        color: #0f172a;
-        font-size: 13px;
+        color: var(--text-strong);
+        font-size: var(--font-lg);
         line-height: 1.2;
         white-space: nowrap;
       }
@@ -355,9 +401,9 @@
         min-width: 70px;
         height: 32px;
         padding: 0 10px;
-        color: #f8fafc;
-        background: #2563eb;
-        box-shadow: 0 8px 16px rgba(37, 99, 235, 0.18);
+        color: var(--surface);
+        background: var(--primary);
+        box-shadow: var(--shadow-button);
       }
 
       .tool-setup {
@@ -365,7 +411,7 @@
         gap: 10px;
         margin-top: 10px;
         padding-top: 10px;
-        border-top: 1px solid rgba(148, 163, 184, 0.2);
+        border-top: 1px solid var(--border);
       }
 
       .list-run-row {
@@ -382,8 +428,8 @@
 
       .tool-setup-title h3 {
         margin: 0;
-        color: #0f172a;
-        font-size: 12px;
+        color: var(--text-strong);
+        font-size: var(--font-md);
         line-height: 1.2;
       }
 
@@ -410,9 +456,13 @@
       }
 
       .danger-button {
-        color: #ffffff;
-        background: #dc2626;
-        box-shadow: 0 10px 20px rgba(185, 28, 28, 0.18);
+        color: var(--surface);
+        background: var(--danger);
+        box-shadow: 0 8px 16px rgba(185, 28, 28, 0.18);
+      }
+
+      .danger-button:hover:not(:disabled) {
+        background: var(--danger-hover);
       }
 
       .status {
@@ -424,13 +474,13 @@
         margin-left: 4px;
         overflow: hidden;
         padding: 0 8px;
-        border: 1px solid rgba(14, 165, 233, 0.16);
+        border: 1px solid var(--info-border);
         border-radius: 8px;
-        background: #f0f9ff;
-        font-size: 10px;
+        background: var(--info-surface);
+        font-size: var(--font-xs);
         font-weight: 700;
         line-height: 1;
-        color: #075985;
+        color: var(--info);
         text-overflow: ellipsis;
         white-space: nowrap;
       }
@@ -450,20 +500,25 @@
         align-items: center;
         justify-content: space-between;
         gap: 8px;
-        font-size: 11px;
+        font-size: var(--font-sm);
         font-weight: 900;
-        color: rgba(15, 23, 42, 0.72);
+        color: var(--text-muted);
       }
 
       .report-copy-button {
         width: auto;
         height: 26px;
         padding: 0 8px;
-        border: 1px solid rgba(37, 99, 235, 0.2);
-        color: #1d4ed8;
-        background: #eff6ff;
+        border: 1px solid var(--primary-border);
+        color: var(--primary-hover);
+        background: var(--surface-soft);
         box-shadow: none;
-        font-size: 10px;
+        font-size: var(--font-xs);
+      }
+
+      .report-copy-button:hover:not(:disabled) {
+        color: var(--surface);
+        background: var(--primary);
       }
 
       .report-preview {
@@ -471,18 +526,18 @@
         max-height: 118px;
         overflow: auto;
         padding: 8px;
-        border: 1px solid rgba(148, 163, 184, 0.34);
+        border: 1px solid var(--border-strong);
         border-radius: 8px;
-        background: #ffffff;
-        color: #172033;
-        font-size: 11px;
+        background: var(--surface);
+        color: var(--text);
+        font-size: var(--font-sm);
         font-weight: 600;
         line-height: 1.35;
       }
 
       .report-preview:empty::before {
         content: "No data";
-        color: rgba(15, 23, 42, 0.34);
+        color: var(--text-muted);
       }
 
     </style>
@@ -500,7 +555,7 @@
             </div>
           </div>
           <div class="top-actions">
-            <span id="version" class="version-pill">v1.10.2</span>
+            <span id="version" class="version-pill">v1.10.4</span>
           </div>
         </div>
 
