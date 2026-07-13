@@ -9,7 +9,7 @@ Current tools:
 
 ## Version
 
-Current version: `1.2.0`
+Current version: `1.3.0`
 
 Versioning uses semantic versioning:
 
@@ -19,9 +19,20 @@ Versioning uses semantic versioning:
 
 ## Version Notes
 
+### 1.3.0
+
+- Added percentage progress feedback for Content Asset Export runs.
+
+### 1.2.1
+
+- Typed and reorganized Content Asset Export internals without changing export behavior.
+- Split site IDs and allowed locales into `src/features/content-asset/config.ts`.
+- Added reusable helper functions to prepare for future list-based content ID export.
+
 ### 1.2.0
 
 - Converted Content Asset Export to TypeScript and a manifest-loaded content script.
+- Moved Content Asset Export site and locale settings into `src/features/content-asset/config.ts`.
 - Popup now sends a tab message to run the exporter instead of injecting the exporter file.
 
 ### 1.1.1
@@ -88,6 +99,7 @@ This creates `ferbtools-production.zip`.
 ```text
 src/
   app/background.ts
+  features/content-asset/config.ts
   features/content-asset/content-asset-export.ts
   features/check-in/content.ts
   features/check-in/popup.ts

@@ -1,10 +1,36 @@
-// @ts-nocheck
 namespace FerbToolsContentAssetExport {
-  const bmUrls = {
-    libraries: '/on/demandware.store/Sites-Site/default/ViewContentSharedLibrary-List?SelectedMenuItem=content&CurrentMenuItemId=content',
-  };
+  type ContentAssetGroupKey = 'generic' | 'page' | 'custom' | 'sitemap';
+  type XmlWrapperKey = ContentAssetGroupKey | 'folder';
 
-  const fieldTagMap = {
+  interface ContentAssetItem {
+    id: string;
+    lang: string;
+    isLocalized: boolean;
+    values: string[];
+    siteSpecificUrl?: string;
+  }
+
+  type ContentAssetGroups = Record<ContentAssetGroupKey, ContentAssetItem[]>;
+
+  interface LibraryInfo {
+    shared: boolean;
+    xml?: string;
+  }
+
+  interface ContentAssetResult {
+    xml: string;
+    filename: string;
+  }
+
+  interface XmlWrapper {
+    opening: string;
+    closing: string;
+  }
+
+  type SiteValueFormatter = (values: string[]) => string;
+  type Renderer = (items: ContentAssetItem[]) => Promise<string> | string;
+
+  const FIELD_TAG_MAP: Record<string, string> = {
     name: 'display-name',
     description: 'description',
     onlineFlag: 'online-flag',
@@ -19,82 +45,63 @@ namespace FerbToolsContentAssetExport {
     template: 'template',
   };
 
-  const siteIdByName = {
-    'TUMI Australia': 'Tumi_AU',
-    'TUMI Hong Kong': 'Tumi_HK',
-    'TUMI Indonesia': 'Tumi_ID',
-    'TUMI Japan': 'Tumi_JP',
-    'TUMI Korea': 'Tumi_KR',
-    'TUMI Malaysia': 'Tumi_MY',
-    'TUMI Singapore': 'Tumi_SG',
-    'TUMI Thailand': 'Tumi_TH',
-    'TUMI Taiwan': 'Tumi_TW',
-  };
-
-  const allowedLocales = ['default', 'zh_HK', 'zh_TW', 'en_AU', 'en_HK', 'en_ID', 'en_MY', 'en_SG', 'en_TH', 'in_ID', 'ja_JP', 'ko_KR', 'th_TH'];
-
-  const xmlWrappers = {
-    page: { opening: '<page-attributes>', closing: '</page-attributes>' },
+  const XML_WRAPPERS: Record<XmlWrapperKey, XmlWrapper> = {
+    page: { opening: '        <page-attributes>\n', closing: '        </page-attributes>\n' },
     custom: { opening: '        <custom-attributes>\n', closing: '        </custom-attributes>\n' },
     folder: { opening: '<folder-links>', closing: '</folder-links>' },
     generic: { opening: '', closing: '' },
     sitemap: { opening: '', closing: '' },
   };
 
-  const genericFields = ['ID', 'name', 'description', 'onlineFlag', 'searchableFlag', 'pageTitle', 'pageDescription', 'pageKeywords', 'pageURL', 'template'];
+  const GENERIC_FIELDS = ['ID', 'name', 'description', 'onlineFlag', 'searchableFlag', 'pageTitle', 'pageDescription', 'pageKeywords', 'pageURL', 'template'];
+  const SITEMAP_FIELDS = ['siteMapIncluded', 'siteMapChangeFrequency', 'siteMapPriority'];
+  const PAGE_FIELDS = ['pageTitle', 'pageDescription', 'pageKeywords', 'pageURL'];
+  const IGNORED_FIELDS = ['ID'];
+  const GROUP_KEYS: ContentAssetGroupKey[] = ['generic', 'page', 'custom', 'sitemap'];
 
-  const sitemapFields = ['siteMapIncluded', 'siteMapChangeFrequency', 'siteMapPriority'];
-
-  const pageFields = ['pageTitle', 'pageDescription', 'pageKeywords', 'pageURL'];
-
-  const ignoredFields = ['ID'];
-
-  const renderers = {
-    cleanup(items) {
-      return items.filter((item) => {
+  const renderers: Record<ContentAssetGroupKey, Renderer> & {
+    cleanup: (items: ContentAssetItem[]) => ContentAssetItem[];
+    getDataBySite: (url: string, openingTag: string, closingTag: string, formatValues?: SiteValueFormatter) => Promise<string>;
+    folder: (items: Element[]) => string;
+  } = {
+    cleanup(items: ContentAssetItem[]): ContentAssetItem[] {
+      return items.filter((item: ContentAssetItem): boolean => {
         if (item.siteSpecificUrl) return true;
-        return item.values.filter((v) => v !== '' && v !== '_NONE_').length > 0;
+        return item.values.filter(isEffectiveValue).length > 0;
       });
     },
 
-    async getDataBySite(url, openingTag, closingTag, formatValues) {
+    async getDataBySite(url: string, openingTag: string, closingTag: string, formatValues?: SiteValueFormatter): Promise<string> {
       let siteSpecificXml = '';
-      const html = await fetch(url, { credentials: 'include' }).then((res) => res.text());
-      const doc = new DOMParser().parseFromString(html, 'text/html');
-      const uncheckedInputs = doc.querySelectorAll('input[type="checkbox"]:not(:checked)');
+      const doc: Document = await fetchHtmlDocument(url);
+      const uncheckedInputs: NodeListOf<HTMLInputElement> = doc.querySelectorAll('input[type="checkbox"]:not(:checked)');
 
-      uncheckedInputs.forEach((input) => {
-        const inputTable = input.closest('table');
-        const wrapperContainer = inputTable ? inputTable.closest('tr')?.closest('table')?.closest('tr') : null;
+      uncheckedInputs.forEach((input: HTMLInputElement): void => {
+        const inputTable: HTMLTableElement | null = input.closest('table');
+        const wrapperContainer: HTMLTableRowElement | null = inputTable ? inputTable.closest('tr')?.closest('table')?.closest('tr') ?? null : null;
         if (!wrapperContainer) {
           return;
         }
 
-        const siteDetail = wrapperContainer.querySelector('.table_detail');
-        const containerNode = wrapperContainer.querySelector('[id$="_Container"]');
+        const siteDetail: HTMLElement | null = wrapperContainer.querySelector<HTMLElement>('.table_detail');
+        const containerNode: HTMLElement | null = wrapperContainer.querySelector<HTMLElement>('[id$="_Container"]');
         if (!siteDetail || !containerNode) {
           return;
         }
 
-        const siteName = siteDetail.innerText.trim().split(':')[0];
-        const siteId = siteIdByName[siteName];
+        const siteName: string = siteDetail.innerText.trim().split(':')[0];
+        const siteId: string | undefined = FerbToolsContentAssetConfig.SITE_ID_BY_NAME[siteName];
 
         if (siteId) {
-          const containerId = containerNode.id.split('_Container')[0];
-          const siteValues = Array.from(wrapperContainer.querySelectorAll(`[name=${containerId}]`)).map((input) =>
-            input.value
-              .replace(/&/gi, '&amp;')
-              .replace(/</gi, '&lt;')
-              .replace(/\r\n|\r|\n/g, '&#13;\n')
-              .replace(/>/gi, '&gt;')
-          );
-          const effectiveValues = siteValues.filter((value) => value !== '' && value !== '_NONE_');
+          const containerId: string = containerNode.id.split('_Container')[0];
+          const siteValues: string[] = Array.from(wrapperContainer.querySelectorAll<HTMLInputElement>(`[name=${containerId}]`)).map((valueInput: HTMLInputElement): string => escapeXmlValue(valueInput.value));
+          const effectiveValues: string[] = siteValues.filter(isEffectiveValue);
           if (effectiveValues.length === 0) {
             return;
           }
 
-          const renderedValue = formatValues ? formatValues(effectiveValues) : effectiveValues[0];
-          if (renderedValue === '' || renderedValue === '_NONE_') {
+          const renderedValue: string = formatValues ? formatValues(effectiveValues) : effectiveValues[0];
+          if (!isEffectiveValue(renderedValue)) {
             return;
           }
 
@@ -105,54 +112,39 @@ namespace FerbToolsContentAssetExport {
       return siteSpecificXml;
     },
 
-    async generic(items) {
-      const chunks = await Promise.all(
-        renderers.cleanup(items).map(async (item) => {
+    async generic(items: ContentAssetItem[]): Promise<string> {
+      const chunks: string[] = await Promise.all(
+        renderers.cleanup(items).map(async (item: ContentAssetItem): Promise<string> => {
+          const fieldTag: string = FIELD_TAG_MAP[item.id];
+
           if (item.siteSpecificUrl) {
-            let defaultXml = item.values[0] !== '' && item.values[0] !== '_NONE_' ? `        <${fieldTagMap[item.id]}>${item.values[0]}</${fieldTagMap[item.id]}>\n` : '';
-            const siteSpecificText = await renderers.getDataBySite(item.siteSpecificUrl, `        <${fieldTagMap[item.id]} site-id="###">`, `</${fieldTagMap[item.id]}>`);
+            const defaultXml: string = isEffectiveValue(item.values[0]) ? `        <${fieldTag}>${item.values[0]}</${fieldTag}>\n` : '';
+            const siteSpecificText: string = await renderers.getDataBySite(item.siteSpecificUrl, `        <${fieldTag} site-id="###">`, `</${fieldTag}>`);
 
             return defaultXml + siteSpecificText;
           }
 
-          return `        <${fieldTagMap[item.id]}${item.isLocalized ? ` xml:lang="${item.lang}">` : '>'}${item.values[0]}</${fieldTagMap[item.id]}>\n`;
+          return `            <${fieldTag}${item.isLocalized ? ` xml:lang="${item.lang}">` : '>'}${item.values[0]}</${fieldTag}>\n`;
         })
       );
 
       return chunks.join('');
     },
 
-    async page(items) {
+    async page(items: ContentAssetItem[]): Promise<string> {
       return renderers.generic(items);
     },
 
-    async custom(items) {
-      const chunks = await Promise.all(
-        renderers.cleanup(items).map(async (item) => {
-          const effectiveValues = item.values.filter((v) => v !== '' && v !== '_NONE_');
-          const value =
-            effectiveValues.length <= 1
-              ? effectiveValues[0] || ''
-              : '\n' +
-                effectiveValues
-                  .map((v) => `<value>${v}</value>`)
-                  .map((v) => '                ' + v)
-                  .join('\n') +
-                '\n            ';
+    async custom(items: ContentAssetItem[]): Promise<string> {
+      const chunks: string[] = await Promise.all(
+        renderers.cleanup(items).map(async (item: ContentAssetItem): Promise<string> => {
+          const effectiveValues: string[] = item.values.filter(isEffectiveValue);
+          const value: string = formatCustomAttributeValues(effectiveValues);
 
           if (item.siteSpecificUrl) {
-            const hasDefaultValue = effectiveValues.length > 0;
-            const defaultXml = hasDefaultValue ? `            <custom-attribute attribute-id="${item.id}">${value}</custom-attribute>\n` : '';
-            const siteSpecificText = await renderers.getDataBySite(item.siteSpecificUrl, `            <custom-attribute site-id="###" attribute-id="${item.id}">`, `</custom-attribute>`, function (values) {
-              return values.length === 1
-                ? values[0]
-                : '\n' +
-                    values
-                      .map((v) => `<value>${v}</value>`)
-                      .map((v) => '                ' + v)
-                      .join('\n') +
-                    '\n            ';
-            });
+            const hasDefaultValue: boolean = effectiveValues.length > 0;
+            const defaultXml: string = hasDefaultValue ? `            <custom-attribute attribute-id="${item.id}">${value}</custom-attribute>\n` : '';
+            const siteSpecificText: string = await renderers.getDataBySite(item.siteSpecificUrl, `            <custom-attribute site-id="###" attribute-id="${item.id}">`, `</custom-attribute>`, formatCustomAttributeValues);
 
             return defaultXml + siteSpecificText;
           }
@@ -164,248 +156,28 @@ namespace FerbToolsContentAssetExport {
       return chunks.join('');
     },
 
-    folder(items) {
+    folder(items: Element[]): string {
       return items
-        .map((item) => {
-          return `<${item.parentNode.childNodes[6].childNodes[0].checked ? 'classification-link' : 'folder-link'} folder-id="${item.innerHTML.trim()}" />`;
+        .map((item: Element): string => {
+          const parentNode: ParentNode | null = item.parentNode;
+          const checkCellInput: HTMLInputElement | undefined = parentNode?.childNodes[6]?.childNodes[0] as HTMLInputElement | undefined;
+
+          return `<${checkCellInput?.checked ? 'classification-link' : 'folder-link'} folder-id="${(item as HTMLElement).innerHTML.trim()}" />`;
         })
         .join('');
     },
 
-    async sitemap(items) {
+    async sitemap(items: ContentAssetItem[]): Promise<string> {
       return renderers.generic(items);
     },
   };
-
-  function hasNonLocalizedItem(items, id) {
-    return !!items.find((item) => item.id === id && !item.isLocalized);
-  }
-
-  function getParameterByName(name, url) {
-    const source = url || window.location.href;
-    const safeName = name.replace(/[\[\]]/g, '\\$&');
-    const regex = new RegExp(`[?&]${safeName}(=([^&#]*)|&|#|$)`);
-    const results = regex.exec(source);
-
-    if (!results) return null;
-    if (!results[2]) return '';
-    return decodeURIComponent(results[2].replace(/\+/g, ' '));
-  }
-
-  function isModernBmUi() {
-    return !!document.getElementById('siteselect_select');
-  }
-
-  function getMerchantToolsSelectedSiteName() {
-    const siteSelect = document.getElementById('siteselect_select');
-    if (siteSelect) {
-      const valueNode = siteSelect.querySelector('.slds-combobox__input-value');
-      if (valueNode && valueNode.textContent.trim()) {
-        return valueNode.textContent.trim();
-      }
-    }
-    return null;
-  }
-
-  function fetchFolderLinks() {
-    const url = window.location.href.replace('ViewLibraryContent', 'ViewLibraryContentFolders').replace('-Dispatch', '-Start');
-
-    return new Promise((resolve) => {
-      const nextUrl = new URL(url);
-      const contentUUID = document.querySelector('[name=ContentUUID]');
-
-      nextUrl.search = new URLSearchParams([['ContentUUID', contentUUID.value]]).toString();
-
-      fetch(nextUrl, { credentials: 'include' })
-        .then((res) => res.text())
-        .then((html) => {
-          const doc = new DOMParser().parseFromString(html, 'text/html');
-          resolve([...doc.querySelectorAll('.table_detail.e.s.bold')]);
-        });
-    });
-  }
-
-  function fetchLibraryInfo() {
-    const selected = document.getElementsByClassName('sod_option selected active ');
-    let repositoryUuid = null;
-
-    repositoryUuid = selected.length ? selected[0].innerText : null;
-
-    if (isModernBmUi()) {
-      repositoryUuid = getMerchantToolsSelectedSiteName();
-    }
-
-    let result = {};
-
-    return new Promise((resolve) => {
-      const csrfToken = getParameterByName('csrf_token', window.location.href);
-      const url = new URL(`${window.location.origin}${bmUrls.libraries}`);
-
-      url.searchParams.set('RepositoryUUID', repositoryUuid);
-      url.searchParams.set('csrf_token', csrfToken);
-
-      fetch(url.toString(), { credentials: 'include' })
-        .then((res) => res.text())
-        .then((html) => {
-          const detailNodes = [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('.table_detail:not(.bold)')];
-          const selectedNode = detailNodes.find((node) => node.innerHTML.includes(repositoryUuid));
-
-          if (!selectedNode || !selectedNode.parentNode || !selectedNode.parentNode.children) {
-            resolve({ shared: false });
-            return;
-          }
-
-          const rowChildren = selectedNode.parentNode.children;
-
-          result =
-            rowChildren[1].innerText.indexOf('Shared') > -1
-              ? {
-                  xml: `<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31" library-id="${rowChildren[0].innerText.trim()}">\n`,
-                  shared: true,
-                }
-              : { shared: false };
-
-          resolve(result);
-        });
-    });
-  }
-
-  function isLocalized(fieldNode) {
-    const firstCell = Array.from(fieldNode.parentElement.children)[0];
-    return !!(firstCell.hasAttribute('title') && firstCell.title === 'Localized');
-  }
-
-  function isSiteSpecific(fieldNode) {
-    const firstCell = Array.from(fieldNode.parentElement.children)[0];
-    return !!(firstCell.hasAttribute('title') && firstCell.title === 'Site-Specific');
-  }
-
-  async function renderGroupedXml(groups) {
-    const chunks = await Promise.all(
-      Object.keys(groups).map(async (key) => {
-        const wrapper = xmlWrappers[key];
-        const xml = await renderers[key].call(this, groups[key]);
-        return xml !== '' ? wrapper.opening + xml + wrapper.closing : '';
-      })
-    );
-
-    return chunks.join('');
-  }
-
-  function buildContentAsset() {
-    console.log('Building content asset...');
-    const localeSelect = document.querySelector('[name="LocaleId"]');
-    const contentUUID = document.querySelector('[name="ContentUUID"]');
-    const localeForm = document.querySelector('form[name="localeForm"]');
-    const localeOptions = [...localeSelect.options].filter((option) => (allowedLocales.length ? allowedLocales.includes(option.value) : true)).sort((a, b) => a.value.localeCompare(b.value));
-    const localeFormAction = localeForm.action;
-    const baseQuery = `?&ContentUUID=${contentUUID.value}&switch=switch&LocaleId=`;
-
-    let xmlLang;
-
-    const localeRequests = localeOptions.map((option) => fetch(`${localeFormAction}${baseQuery}${option.value}`, { credentials: 'include' }).then((res) => res.text()));
-
-    return new Promise((resolve) => {
-      Promise.all(localeRequests)
-        .then((htmlPages) => {
-          const parser = new DOMParser();
-          const grouped = htmlPages.reduce(
-            (acc, html) => {
-              const doc = parser.parseFromString(html, 'text/html');
-              const tooltipNodes = doc.querySelectorAll('[data-dw-tooltip]');
-              const localeId = doc.getElementsByName('LocaleId')[0].value;
-
-              xmlLang = localeId === 'default' ? 'x-default' : localeId.replace('_', '-');
-
-              tooltipNodes.forEach((node) => {
-                const parts = node.dataset.dwTooltip.split('.');
-
-                if (parts[0] === 'Content') {
-                  const id = parts[1];
-                  const item = {
-                    id,
-                    lang: xmlLang,
-                    isLocalized: isLocalized(node),
-                    values: Array.from(doc.querySelectorAll(`[name=Meta${node.dataset.dwAttruuid}]`)).map((input) =>
-                      input.value
-                        .replace(/&/gi, '&amp;')
-                        .replace(/</gi, '&lt;')
-                        .replace(/\r\n|\r|\n/g, '&#13;\n')
-                        .replace(/>/gi, '&gt;')
-                    ),
-                  };
-
-                  if (isSiteSpecific(node)) {
-                    const tableNode = node.closest('table');
-                    const rowNode = tableNode ? tableNode.closest('tr') : null;
-                    const showAllLink = rowNode ? rowNode.querySelector('.ssa_show_all a') : null;
-                    const onclickValue = showAllLink ? showAllLink.getAttribute('onclick') : null;
-                    const urlMatch = onclickValue ? onclickValue.match(/'([^']+)'/) : null;
-                    const url = urlMatch ? urlMatch[1] : null;
-
-                    if (url) {
-                      item.siteSpecificUrl = url;
-                    }
-                  }
-
-                  if (!genericFields.includes(id) && !sitemapFields.includes(id) && !pageFields.includes(id) && !hasNonLocalizedItem(acc.custom, id)) {
-                    acc.custom.push(item);
-                  } else if (!pageFields.includes(id) || sitemapFields.includes(id) || hasNonLocalizedItem(acc.page, id)) {
-                    if (!genericFields.includes(id) || sitemapFields.includes(id) || hasNonLocalizedItem(acc.generic, id) || ignoredFields.includes(id)) {
-                      if (sitemapFields.includes(id) && !hasNonLocalizedItem(acc.sitemap, id)) {
-                        acc.sitemap.push(item);
-                      }
-                    } else {
-                      acc.generic.push(item);
-                    }
-                  } else {
-                    acc.page.push(item);
-                  }
-                }
-              });
-
-              return acc;
-            },
-            { generic: [], page: [], custom: [], sitemap: [] }
-          );
-
-          const names = grouped.generic.filter((item) => item.id === 'name');
-          const descriptions = grouped.generic.filter((item) => item.id === 'description');
-          const rest = grouped.generic.filter((item) => item.id !== 'name' && item.id !== 'description');
-
-          grouped.generic = [...names, ...descriptions, ...rest];
-
-          Object.keys(grouped).forEach((key) => {
-            grouped[key] = grouped[key].sort((a, b) => a.id.localeCompare(b.id));
-          });
-
-          return grouped;
-        })
-        .then((grouped) => {
-          Promise.all([fetchLibraryInfo(), fetchFolderLinks()]).then(async (results) => {
-            const [libraryInfo, folderNodes] = results;
-            const foldersXml = renderers.folder(folderNodes);
-            const libraryOpen = libraryInfo.shared ? libraryInfo.xml : '<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31">';
-            const contentId = document.getElementsByClassName('table_detail')[0].childNodes[1].value;
-            const groupedXml = await renderGroupedXml(grouped);
-
-            const rawXml = ['<?xml version="1.0" encoding="UTF-8"?>\n', libraryOpen, `    <content content-id="${contentId}">\n`, groupedXml, '        <folder-links>\n', foldersXml !== '' ? `${foldersXml}\n` : '', '        </folder-links>\n', '    </content>\n', '</library>'].join('');
-
-            resolve({
-              xml: rawXml,
-              filename: contentId,
-            });
-          });
-        });
-    });
-  }
 
   chrome.runtime.onMessage.addListener((message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: ContentAssetExportResponse) => void): boolean | void => {
     if (!isContentAssetExportMessage(message)) {
       return;
     }
 
-    generateContentAsset()
+    generateContentAsset(message.runId)
       .then((): void => {
         sendResponse({ success: true });
       })
@@ -420,23 +192,335 @@ namespace FerbToolsContentAssetExport {
     return true;
   });
 
-  async function generateContentAsset(): Promise<void> {
-    return buildContentAsset().then((result) => {
-      const blob = new Blob([result.xml], { type: 'text/xml' });
-      const button = document.createElement('a');
+  async function generateContentAsset(runId: string): Promise<void> {
+    reportProgress(runId, 2, 'Preparing export');
+    const result: ContentAssetResult = await buildContentAsset(runId);
+    reportProgress(runId, 96, 'Preparing download');
+    const blob = new Blob([result.xml], { type: 'text/xml' });
+    const button = document.createElement('a');
 
-      button.textContent = 'Download';
-      window.URL = window.URL || window.webkitURL;
-      button.href = window.URL.createObjectURL(blob);
-      button.download = `${result.filename}.xml`;
-      button.dataset.loaded = true;
-      button.style.pointerEvents = 'initial';
-      button.click();
-      console.log('Content asset generated and download initiated.');
+    button.textContent = 'Download';
+    window.URL = window.URL || window.webkitURL;
+    button.href = window.URL.createObjectURL(blob);
+    button.download = `${result.filename}.xml`;
+    button.dataset.loaded = 'true';
+    button.style.pointerEvents = 'initial';
+    button.click();
+    reportProgress(runId, 100, 'Download started');
+    console.log('Content asset generated and download initiated.');
+  }
+
+  async function buildContentAsset(runId: string): Promise<ContentAssetResult> {
+    console.log('Building content asset...');
+    reportProgress(runId, 6, 'Reading page setup');
+    const localeSelect: HTMLSelectElement = requireElement('[name="LocaleId"]', HTMLSelectElement);
+    const contentUUID: HTMLInputElement = requireElement('[name="ContentUUID"]', HTMLInputElement);
+    const localeForm: HTMLFormElement = requireElement('form[name="localeForm"]', HTMLFormElement);
+    const localeOptions: HTMLOptionElement[] = Array.from(localeSelect.options)
+      .filter((option: HTMLOptionElement): boolean => (FerbToolsContentAssetConfig.ALLOWED_LOCALES.length ? FerbToolsContentAssetConfig.ALLOWED_LOCALES.includes(option.value as (typeof FerbToolsContentAssetConfig.ALLOWED_LOCALES)[number]) : true))
+      .sort((a: HTMLOptionElement, b: HTMLOptionElement): number => a.value.localeCompare(b.value));
+    const localeFormAction: string = localeForm.action;
+    const baseQuery = `?&ContentUUID=${contentUUID.value}&switch=switch&LocaleId=`;
+    let completedLocales = 0;
+    const localeRequests: Promise<string>[] = localeOptions.map((option: HTMLOptionElement): Promise<string> => {
+      return fetch(`${localeFormAction}${baseQuery}${option.value}`, { credentials: 'include' })
+        .then((res: Response): Promise<string> => res.text())
+        .then((html: string): string => {
+          completedLocales += 1;
+          reportProgress(runId, getLocaleFetchPercent(completedLocales, localeOptions.length), `Fetched locale ${completedLocales}/${localeOptions.length}`);
+          return html;
+        });
     });
+    const htmlPages: string[] = await Promise.all(localeRequests);
+    reportProgress(runId, 58, 'Parsing locale fields');
+    const grouped: ContentAssetGroups = buildGroupsFromLocalePages(htmlPages);
+    reportProgress(runId, 72, 'Fetching library data');
+    const [libraryInfo, folderNodes]: [LibraryInfo, Element[]] = await Promise.all([fetchLibraryInfo(), fetchFolderLinks()]);
+    reportProgress(runId, 84, 'Rendering XML');
+    const foldersXml: string = renderers.folder(folderNodes);
+    const libraryOpen: string = libraryInfo.shared && libraryInfo.xml ? libraryInfo.xml : '<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31">';
+    const contentId: string = getContentId();
+    const groupedXml: string = await renderGroupedXml(grouped);
+    const rawXml: string = ['<?xml version="1.0" encoding="UTF-8"?>\n', libraryOpen, `    <content content-id="${contentId}">\n`, groupedXml, '        <folder-links>\n', foldersXml !== '' ? `${foldersXml}\n` : '', '        </folder-links>\n', '    </content>\n', '</library>'].join('');
+
+    return {
+      xml: rawXml,
+      filename: contentId,
+    };
+  }
+
+  function getLocaleFetchPercent(completedLocales: number, totalLocales: number): number {
+    if (totalLocales === 0) {
+      return 55;
+    }
+
+    return Math.min(55, 10 + Math.round((completedLocales / totalLocales) * 45));
+  }
+
+  function buildGroupsFromLocalePages(htmlPages: string[]): ContentAssetGroups {
+    const parser = new DOMParser();
+    const grouped: ContentAssetGroups = htmlPages.reduce((acc: ContentAssetGroups, html: string): ContentAssetGroups => {
+      const doc: Document = parser.parseFromString(html, 'text/html');
+      const tooltipNodes: NodeListOf<HTMLElement> = doc.querySelectorAll<HTMLElement>('[data-dw-tooltip]');
+      const localeId: string = getDocumentInputValue(doc, 'LocaleId');
+      const xmlLang: string = localeId === 'default' ? 'x-default' : localeId.replace('_', '-');
+
+      tooltipNodes.forEach((node: HTMLElement): void => {
+        const tooltip: string | undefined = node.dataset.dwTooltip;
+        const attrUuid: string | undefined = node.dataset.dwAttruuid;
+
+        if (!tooltip || !attrUuid) {
+          return;
+        }
+
+        const parts: string[] = tooltip.split('.');
+
+        if (parts[0] !== 'Content') {
+          return;
+        }
+
+        const item: ContentAssetItem = {
+          id: parts[1],
+          lang: xmlLang,
+          isLocalized: isLocalized(node),
+          values: Array.from(doc.querySelectorAll<HTMLInputElement>(`[name=Meta${attrUuid}]`)).map((input: HTMLInputElement): string => escapeXmlValue(input.value)),
+        };
+        const siteSpecificUrl: string | null = getSiteSpecificUrl(node);
+
+        if (siteSpecificUrl) {
+          item.siteSpecificUrl = siteSpecificUrl;
+        }
+
+        addItemToGroups(acc, item);
+      });
+
+      return acc;
+    }, createEmptyGroups());
+
+    grouped.generic = sortNameDescriptionFirst(grouped.generic);
+
+    GROUP_KEYS.forEach((key: ContentAssetGroupKey): void => {
+      grouped[key] = grouped[key].sort((a: ContentAssetItem, b: ContentAssetItem): number => a.id.localeCompare(b.id));
+    });
+
+    return grouped;
+  }
+
+  function addItemToGroups(groups: ContentAssetGroups, item: ContentAssetItem): void {
+    const id: string = item.id;
+
+    if (!GENERIC_FIELDS.includes(id) && !SITEMAP_FIELDS.includes(id) && !PAGE_FIELDS.includes(id) && !hasNonLocalizedItem(groups.custom, id)) {
+      groups.custom.push(item);
+      return;
+    }
+
+    if (!PAGE_FIELDS.includes(id) || SITEMAP_FIELDS.includes(id) || hasNonLocalizedItem(groups.page, id)) {
+      if (!GENERIC_FIELDS.includes(id) || SITEMAP_FIELDS.includes(id) || hasNonLocalizedItem(groups.generic, id) || IGNORED_FIELDS.includes(id)) {
+        if (SITEMAP_FIELDS.includes(id) && !hasNonLocalizedItem(groups.sitemap, id)) {
+          groups.sitemap.push(item);
+        }
+
+        return;
+      }
+
+      groups.generic.push(item);
+      return;
+    }
+
+    groups.page.push(item);
+  }
+
+  function createEmptyGroups(): ContentAssetGroups {
+    return {
+      generic: [],
+      page: [],
+      custom: [],
+      sitemap: [],
+    };
+  }
+
+  function sortNameDescriptionFirst(items: ContentAssetItem[]): ContentAssetItem[] {
+    const names: ContentAssetItem[] = items.filter((item: ContentAssetItem): boolean => item.id === 'name');
+    const descriptions: ContentAssetItem[] = items.filter((item: ContentAssetItem): boolean => item.id === 'description');
+    const rest: ContentAssetItem[] = items.filter((item: ContentAssetItem): boolean => item.id !== 'name' && item.id !== 'description');
+
+    return [...names, ...descriptions, ...rest];
+  }
+
+  function hasNonLocalizedItem(items: ContentAssetItem[], id: string): boolean {
+    return !!items.find((item: ContentAssetItem): boolean => item.id === id && !item.isLocalized);
+  }
+
+  function getParameterByName(name: string, url?: string): string | null {
+    const source: string = url || window.location.href;
+    const safeName: string = name.replace(/[\[\]]/g, '\\$&');
+    const regex = new RegExp(`[?&]${safeName}(=([^&#]*)|&|#|$)`);
+    const results: RegExpExecArray | null = regex.exec(source);
+
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2].replace(/\+/g, ' '));
+  }
+
+  function isModernBmUi(): boolean {
+    return !!document.getElementById('siteselect_select');
+  }
+
+  function getMerchantToolsSelectedSiteName(): string | null {
+    const siteSelect: HTMLElement | null = document.getElementById('siteselect_select');
+    if (siteSelect) {
+      const valueNode: HTMLElement | null = siteSelect.querySelector<HTMLElement>('.slds-combobox__input-value');
+      if (valueNode && valueNode.textContent?.trim()) {
+        return valueNode.textContent.trim();
+      }
+    }
+    return null;
+  }
+
+  async function fetchFolderLinks(): Promise<Element[]> {
+    const url: string = window.location.href.replace('ViewLibraryContent', 'ViewLibraryContentFolders').replace('-Dispatch', '-Start');
+    const nextUrl = new URL(url);
+    const contentUUID: HTMLInputElement = requireElement('[name=ContentUUID]', HTMLInputElement);
+
+    nextUrl.search = new URLSearchParams([['ContentUUID', contentUUID.value]]).toString();
+
+    const doc: Document = await fetchHtmlDocument(nextUrl.toString());
+    return Array.from(doc.querySelectorAll('.table_detail.e.s.bold'));
+  }
+
+  async function fetchLibraryInfo(): Promise<LibraryInfo> {
+    const selected: HTMLCollectionOf<Element> = document.getElementsByClassName('sod_option selected active ');
+    let repositoryUuid: string | null = selected.length ? (selected[0] as HTMLElement).innerText : null;
+
+    if (isModernBmUi()) {
+      repositoryUuid = getMerchantToolsSelectedSiteName();
+    }
+
+    const csrfToken: string | null = getParameterByName('csrf_token', window.location.href);
+    const url = new URL(`${window.location.origin}${FerbToolsContentAssetConfig.BM_URLS.libraries}`);
+
+    url.searchParams.set('RepositoryUUID', repositoryUuid ?? '');
+    url.searchParams.set('csrf_token', csrfToken ?? '');
+
+    const doc: Document = await fetchHtmlDocument(url.toString());
+    const detailNodes: HTMLElement[] = Array.from(doc.querySelectorAll<HTMLElement>('.table_detail:not(.bold)'));
+    const selectedNode: HTMLElement | undefined = detailNodes.find((node: HTMLElement): boolean => node.innerHTML.includes(repositoryUuid ?? ''));
+
+    if (!selectedNode || !selectedNode.parentElement?.children) {
+      return { shared: false };
+    }
+
+    const rowChildren: HTMLCollection = selectedNode.parentElement.children;
+    const libraryType: string = (rowChildren[1] as HTMLElement).innerText;
+
+    return libraryType.indexOf('Shared') > -1
+      ? {
+          xml: `<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31" library-id="${(rowChildren[0] as HTMLElement).innerText.trim()}">\n`,
+          shared: true,
+        }
+      : { shared: false };
+  }
+
+  function isLocalized(fieldNode: Element): boolean {
+    const firstCell: Element | undefined = Array.from(fieldNode.parentElement?.children ?? [])[0];
+    return !!(firstCell?.hasAttribute('title') && firstCell.getAttribute('title') === 'Localized');
+  }
+
+  function isSiteSpecific(fieldNode: Element): boolean {
+    const firstCell: Element | undefined = Array.from(fieldNode.parentElement?.children ?? [])[0];
+    return !!(firstCell?.hasAttribute('title') && firstCell.getAttribute('title') === 'Site-Specific');
+  }
+
+  async function renderGroupedXml(groups: ContentAssetGroups): Promise<string> {
+    const chunks: string[] = await Promise.all(
+      GROUP_KEYS.map(async (key: ContentAssetGroupKey): Promise<string> => {
+        const wrapper: XmlWrapper = XML_WRAPPERS[key];
+        const xml: string = await renderers[key](groups[key]);
+        return xml !== '' ? wrapper.opening + xml + wrapper.closing : '';
+      })
+    );
+
+    return chunks.join('');
+  }
+
+  async function fetchHtmlDocument(url: string): Promise<Document> {
+    const html: string = await fetch(url, { credentials: 'include' }).then((res: Response): Promise<string> => res.text());
+    return new DOMParser().parseFromString(html, 'text/html');
+  }
+
+  function getDocumentInputValue(doc: Document, name: string): string {
+    const input: HTMLInputElement | null = doc.querySelector<HTMLInputElement>(`[name="${name}"]`);
+    return input?.value ?? '';
+  }
+
+  function getSiteSpecificUrl(node: Element): string | null {
+    if (!isSiteSpecific(node)) {
+      return null;
+    }
+
+    const tableNode: HTMLTableElement | null = node.closest('table');
+    const rowNode: HTMLTableRowElement | null = tableNode ? tableNode.closest('tr') : null;
+    const showAllLink: HTMLAnchorElement | null = rowNode ? rowNode.querySelector<HTMLAnchorElement>('.ssa_show_all a') : null;
+    const onclickValue: string | null = showAllLink ? showAllLink.getAttribute('onclick') : null;
+    const urlMatch: RegExpMatchArray | null = onclickValue ? onclickValue.match(/'([^']+)'/) : null;
+
+    return urlMatch ? urlMatch[1] : null;
+  }
+
+  function getContentId(): string {
+    const detailNode: Element | undefined = document.getElementsByClassName('table_detail')[0];
+    const contentInput: HTMLInputElement | undefined = detailNode?.childNodes[1] as HTMLInputElement | undefined;
+
+    if (!contentInput?.value) {
+      throw new Error('Unable to detect content asset ID.');
+    }
+
+    return contentInput.value;
+  }
+
+  function requireElement<TElement extends Element>(selector: string, constructor: { new (): TElement }): TElement {
+    const element: Element | null = document.querySelector(selector);
+
+    if (!(element instanceof constructor)) {
+      throw new Error(`Missing element: ${selector}`);
+    }
+
+    return element;
+  }
+
+  function escapeXmlValue(value: string): string {
+    return value
+      .replace(/&/gi, '&amp;')
+      .replace(/</gi, '&lt;')
+      .replace(/\r\n|\r|\n/g, '&#13;\n')
+      .replace(/>/gi, '&gt;');
+  }
+
+  function isEffectiveValue(value: string | undefined): value is string {
+    return value !== undefined && value !== '' && value !== '_NONE_';
+  }
+
+  function formatCustomAttributeValues(values: string[]): string {
+    return values.length <= 1
+      ? values[0] || ''
+      : '\n' +
+          values
+            .map((value: string): string => `<value>${value}</value>`)
+            .map((value: string): string => '                ' + value)
+            .join('\n') +
+          '\n            ';
   }
 
   function isContentAssetExportMessage(message: unknown): message is ContentAssetExportMessage {
-    return typeof message === 'object' && message !== null && (message as Record<string, unknown>).type === 'RUN_CONTENT_ASSET_EXPORT';
+    return typeof message === 'object' && message !== null && (message as Record<string, unknown>).type === 'RUN_CONTENT_ASSET_EXPORT' && typeof (message as Record<string, unknown>).runId === 'string';
+  }
+
+  function reportProgress(runId: string, percent: number, label: string): void {
+    void chrome.runtime.sendMessage({
+      type: 'CONTENT_ASSET_EXPORT_PROGRESS',
+      runId,
+      percent,
+      label,
+    } satisfies ContentAssetExportProgressMessage);
   }
 }

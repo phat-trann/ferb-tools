@@ -81,6 +81,14 @@ interface NoticeSnoozeDailyCheckInPromptMessage {
 
 interface ContentAssetExportMessage {
   type: "RUN_CONTENT_ASSET_EXPORT";
+  runId: string;
+}
+
+interface ContentAssetExportProgressMessage {
+  type: "CONTENT_ASSET_EXPORT_PROGRESS";
+  runId: string;
+  percent: number;
+  label: string;
 }
 
 interface NoticeAcknowledgeCheckoutReminderResponse {
