@@ -70,7 +70,7 @@
         }
 
         const siteDetail = wrapperContainer.querySelector('.table_detail');
-        const containerNode = wrapperContainer.querySelector('.table_detail[id$="_Container"]');
+        const containerNode = wrapperContainer.querySelector('[id$="_Container"]');
         if (!siteDetail || !containerNode) {
           return;
         }
