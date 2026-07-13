@@ -9,7 +9,7 @@ Current tools:
 
 ## Version
 
-Current version: `1.9.1`
+Current version: `1.9.3`
 
 Versioning uses semantic versioning:
 
@@ -18,6 +18,14 @@ Versioning uses semantic versioning:
 - Major: breaking storage, package, or workflow change.
 
 ## Version Notes
+
+### 1.9.3
+
+- Keeps the Check-in switch transition disabled until the initial checked state has been committed.
+
+### 1.9.2
+
+- Prevents the Check-in switch knob from animating when the popup first opens.
 
 ### 1.9.1
 

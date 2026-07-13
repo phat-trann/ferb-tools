@@ -55,6 +55,7 @@ namespace FerbToolsCheckInPopupFeature {
         renderSettings(response.settings);
         renderToday(response.today);
         setStatus('');
+        enableSwitchTransitionAfterInitialRender();
       } catch (error: unknown) {
         setStatus(error instanceof Error ? error.message : 'Không đọc được setup.');
       } finally {
@@ -192,6 +193,19 @@ namespace FerbToolsCheckInPopupFeature {
       if (status) {
         setStatus(status);
       }
+    }
+
+    function enableSwitchTransitionAfterInitialRender(): void {
+      elements.enabledInput.classList.remove('enable-transition');
+
+      const switchTrack: Element | null = elements.enabledInput.nextElementSibling;
+      if (switchTrack instanceof HTMLElement) {
+        void switchTrack.offsetWidth;
+      }
+
+      window.setTimeout((): void => {
+        elements.enabledInput.classList.add('enable-transition');
+      }, 0);
     }
   }
 
