@@ -1,6 +1,6 @@
 {
   "name": "ferbtools-extension",
-  "version": "1.5.1",
+  "version": "1.9.1",
   "private": true,
   "description": "FerbTools Chrome extension toolkit. Made by Ferb.",
   "engines": {

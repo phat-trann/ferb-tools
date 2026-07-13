@@ -16,11 +16,15 @@ namespace FerbToolsContentAssetConfig {
   };
 
   export const ALLOWED_LOCALES = ['default', 'zh_HK', 'zh_TW', 'en_AU', 'en_HK', 'en_ID', 'en_MY', 'en_SG', 'en_TH', 'in_ID', 'ja_JP', 'ko_KR', 'th_TH'] as const;
+  export const DEFAULT_BATCH_CONCURRENCY = 3;
 
   export function createDefaultSettings(): ContentAssetSettings {
     return {
       allowedLocales: [...ALLOWED_LOCALES],
       siteIdByName: { ...SITE_ID_BY_NAME },
+      batchConcurrency: DEFAULT_BATCH_CONCURRENCY,
+      listContentIdsText: '',
+      listFilename: '',
     };
   }
 }

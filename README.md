@@ -9,7 +9,7 @@ Current tools:
 
 ## Version
 
-Current version: `1.5.1`
+Current version: `1.9.1`
 
 Versioning uses semantic versioning:
 
@@ -18,6 +18,64 @@ Versioning uses semantic versioning:
 - Major: breaking storage, package, or workflow change.
 
 ## Version Notes
+
+### 1.9.1
+
+- Ensures exported library XML always has a newline after the opening `<library>` tag.
+
+### 1.9.0
+
+- Saves Content Asset List Export textbox, filename, and parallel settings.
+- Added filename input for list exports and blank lines between exported content nodes.
+- Improved list export progress ranges and popup card alignment.
+
+### 1.8.7
+
+- Removed false CSRF error detection from normal SFCC responses that include the warning string inside script source.
+
+### 1.8.6
+
+- Restored parallel Content Asset list searches with one cloned list page per worker.
+- Extracts CSRF tokens from SFCC `CSRFInjector` scripts when the cloned form has no hidden token input.
+
+### 1.8.5
+
+- Splits Content Asset List Export IDs by whitespace, comma, or semicolon so pasted IDs do not merge into one search term.
+
+### 1.8.4
+
+- Runs Content Asset list searches sequentially so each response supplies the CSRF token for the next search.
+- Keeps detail-page XML builds parallel after each detail link is found.
+
+### 1.8.3
+
+- Uses the actual `ContentListForm.action` URL when cloning the SFCC list page for batch searches.
+- Falls back to the current DOM form only if the cloned page does not include `ContentListForm`.
+
+### 1.8.2
+
+- Validates Content Asset List Export against the real `ContentListForm` before running.
+- Fetches a fresh list page per batch item so each search uses a fresh CSRF token.
+
+### 1.8.1
+
+- Auto-injects Content Asset scripts into the active SFCC tab before retrying export messages.
+- Uses separate refresh messages for detail-page and list-page exports.
+
+### 1.8.0
+
+- Added Content Asset List Export for newline-separated content asset IDs from a Business Manager content list page.
+- Added parallel export control and shared XML library wrapper for list exports.
+
+### 1.7.0
+
+- Refined popup layout with fixed sizing, stable scrolling, and compact one-line status messages.
+- Standardized popup copy and Content Asset Export error text.
+
+### 1.6.0
+
+- Updated Check-in popup rules to skip weekends and skip startup prompts after the configured latest check-in time.
+- Prioritized the current day so stale prompts or checkout reminders from previous days no longer show after reopening the machine.
 
 ### 1.5.1
 

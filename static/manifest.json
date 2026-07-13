@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "FerbTools",
   "description": "FerbTools is a Chrome extension toolkit. Current tool: check-in and checkout reminders. Made by Ferb.",
-  "version": "1.5.1",
+  "version": "1.9.1",
   "permissions": ["storage", "tabs", "alarms", "scripting"],
   "host_permissions": ["<all_urls>"],
   "icons": {

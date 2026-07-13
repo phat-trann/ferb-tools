@@ -47,6 +47,10 @@ interface NoticeShowCheckoutReminderMessage {
   workDurationMinutes: number;
 }
 
+interface NoticeDismissCheckInNoticeMessage {
+  type: "DISMISS_CHECKIN_NOTICE";
+}
+
 interface NoticeCompleteCheckInMessage {
   type: "COMPLETE_CHECKIN";
   checkInTime?: string;
@@ -84,6 +88,14 @@ interface ContentAssetExportMessage {
   runId: string;
 }
 
+interface ContentAssetListExportMessage {
+  type: "RUN_CONTENT_ASSET_LIST_EXPORT";
+  runId: string;
+  contentIds: string[];
+  concurrency: number;
+  filename?: string;
+}
+
 interface ContentAssetExportProgressMessage {
   type: "CONTENT_ASSET_EXPORT_PROGRESS";
   runId: string;
@@ -94,6 +106,9 @@ interface ContentAssetExportProgressMessage {
 interface ContentAssetSettings {
   allowedLocales: string[];
   siteIdByName: Record<string, string>;
+  batchConcurrency: number;
+  listContentIdsText: string;
+  listFilename: string;
 }
 
 interface NoticeAcknowledgeCheckoutReminderResponse {

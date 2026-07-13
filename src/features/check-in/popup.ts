@@ -66,7 +66,7 @@ namespace FerbToolsCheckInPopupFeature {
       const nextSettings: NoticeSettings = readSettingsFromForm();
       const todayCheckInTime: string = elements.todayCheckInTimeInput.value;
 
-      setFormBusy(true, 'Đang lưu setup...');
+      setFormBusy(true, 'Đang lưu...');
 
       try {
         const response: NoticeSettingsResponse = await sendRuntimeMessage<NoticeUpdateSettingsMessage, NoticeSettingsResponse>({
@@ -88,14 +88,14 @@ namespace FerbToolsCheckInPopupFeature {
           });
 
           if (!todayResponse.success) {
-            throw new Error(todayResponse.error ?? 'Không cập nhật được giờ check-in hôm nay.');
+            throw new Error(todayResponse.error ?? 'Không lưu được check-in.');
           }
 
           today = todayResponse.today;
         }
 
         renderToday(today);
-        setStatus(todayCheckInTime ? 'Đã lưu setup và cập nhật giờ check-in hôm nay.' : 'Đã lưu setup. Badge sẽ cập nhật ngay.');
+        setStatus(todayCheckInTime ? 'Đã lưu setup + check-in.' : 'Đã lưu setup.');
       } catch (error: unknown) {
         setStatus(error instanceof Error ? error.message : 'Không lưu được setup.');
       } finally {
@@ -104,7 +104,7 @@ namespace FerbToolsCheckInPopupFeature {
     }
 
     async function saveEnabledSetting(): Promise<void> {
-      setFormBusy(true, elements.enabledInput.checked ? 'Đang bật FerbTools...' : 'Đang tắt FerbTools...');
+      setFormBusy(true, elements.enabledInput.checked ? 'Đang bật...' : 'Đang tắt...');
 
       try {
         const response: NoticeSettingsResponse = await sendRuntimeMessage<NoticeUpdateSettingsMessage, NoticeSettingsResponse>({
@@ -115,14 +115,14 @@ namespace FerbToolsCheckInPopupFeature {
         });
 
         if (!response.success || !response.settings) {
-          throw new Error(response.error ?? 'Không cập nhật được trạng thái FerbTools.');
+          throw new Error(response.error ?? 'Không cập nhật được trạng thái.');
         }
 
         renderSettings(response.settings);
         renderToday(response.today);
-        setStatus(response.settings.enabled ? 'FerbTools đã bật.' : 'FerbTools đã tắt.');
+        setStatus(response.settings.enabled ? 'Đã bật check-in.' : 'Đã tắt check-in.');
       } catch (error: unknown) {
-        setStatus(error instanceof Error ? error.message : 'Không cập nhật được trạng thái FerbTools.');
+        setStatus(error instanceof Error ? error.message : 'Không cập nhật được trạng thái.');
         await loadSettings();
       } finally {
         setFormBusy(false);
@@ -130,7 +130,7 @@ namespace FerbToolsCheckInPopupFeature {
     }
 
     async function clearTodayData(): Promise<void> {
-      setFormBusy(true, 'Đang xóa data hôm nay...');
+      setFormBusy(true, 'Đang xóa...');
 
       try {
         const response: NoticeClearTodayDataResponse = await sendRuntimeMessage<NoticeClearTodayDataMessage, NoticeClearTodayDataResponse>({
@@ -142,7 +142,7 @@ namespace FerbToolsCheckInPopupFeature {
         }
 
         renderToday(response.today);
-        setStatus('Đã xóa data hôm nay. Badge sẽ cập nhật ngay.');
+        setStatus('Đã xóa ngày hiện tại.');
       } catch (error: unknown) {
         setStatus(error instanceof Error ? error.message : 'Không xóa được data hôm nay.');
       } finally {
@@ -160,15 +160,15 @@ namespace FerbToolsCheckInPopupFeature {
     function renderToday(today: NoticeTodayStatus | undefined): void {
       if (!today || !today.hasCheckIn) {
         elements.todayCheckInTimeInput.value = today?.checkInTime ?? '';
-        elements.todayCheckInNoteElement.textContent = 'Chưa check-in hôm nay. Nếu cần set thủ công, nhập giờ thực tế rồi bấm lưu.';
+        elements.todayCheckInNoteElement.textContent = 'Chưa check-in hôm nay.';
         return;
       }
 
       elements.todayCheckInTimeInput.value = today.checkInTime ?? '';
       const checkInTime: string = today.checkInTime ?? 'chưa rõ';
       elements.todayCheckInNoteElement.textContent = today.checkoutReminderDueTime
-        ? `Check-in hôm nay: ${checkInTime}. Checkout dự kiến: ${today.checkoutReminderDueTime}.`
-        : `Check-in hôm nay: ${checkInTime}.`;
+        ? `Check-in ${checkInTime} - Checkout ${today.checkoutReminderDueTime}`
+        : `Check-in ${checkInTime}`;
     }
 
     function readSettingsFromForm(): NoticeSettings {
@@ -205,7 +205,7 @@ namespace FerbToolsCheckInPopupFeature {
       let isSettled: boolean = false;
       const timeoutId: number = window.setTimeout((): void => {
         isSettled = true;
-        reject(new Error('Background không phản hồi. Reload extension rồi thử lại.'));
+        reject(new Error('Background không phản hồi.'));
       }, RUNTIME_MESSAGE_TIMEOUT_MS);
 
       chrome.runtime.sendMessage(message, (response: TResponse): void => {

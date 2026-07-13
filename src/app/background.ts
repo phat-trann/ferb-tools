@@ -11,6 +11,8 @@ namespace FerbToolsBackground {
   const BADGE_REFRESH_PERIOD_MINUTES = 1;
   const CHECK_IN_PROMPT_SNOOZE_MS = 60 * 60 * 1000;
   const LATE_CHECKIN_MESSAGE = 'Trễ giờ check in T.T';
+  const MONDAY_DAY = 1;
+  const FRIDAY_DAY = 5;
   const DEFAULT_SETTINGS: NoticeSettings = {
     enabled: true,
     latestCheckInTime: '10:00',
@@ -276,11 +278,13 @@ namespace FerbToolsBackground {
     const state: FerbToolsStorageState = await initializeState();
 
     if (!state.features.checkIn.settings.enabled) {
+      await dismissCheckInNotice(tab.id);
       return;
     }
 
     const now: number = Date.now();
-    const pendingReminder: NoticeDailyRecord | null = getPendingCheckoutReminder(state, now);
+    const dayKey: string = getDayKey(now);
+    const pendingReminder: NoticeDailyRecord | null = getPendingCheckoutReminder(state, now, dayKey);
 
     if (pendingReminder) {
       const reminderShown: boolean = await showCheckoutReminder(tab.id, pendingReminder, state.features.checkIn.settings);
@@ -294,16 +298,20 @@ namespace FerbToolsBackground {
       return;
     }
 
-    const activeWorkRecord: NoticeDailyRecord | null = getActiveWorkRecord(state, now);
+    const activeWorkRecord: NoticeDailyRecord | null = getActiveWorkRecord(state, now, dayKey);
 
     if (activeWorkRecord) {
       return;
     }
 
-    const dayKey: string = getDayKey(now);
     const todayRecord: NoticeDailyRecord | undefined = state.features.checkIn.records[dayKey];
 
     if (todayRecord?.checkInAt) {
+      return;
+    }
+
+    if (!shouldShowDailyCheckInPrompt(now, state.features.checkIn.settings)) {
+      await dismissCheckInNotice(tab.id);
       return;
     }
 
@@ -337,6 +345,13 @@ namespace FerbToolsBackground {
       return;
     }
 
+    const now: number = Date.now();
+
+    if (dayKey !== getDayKey(now) || isWeekend(now)) {
+      await refreshActionBadge();
+      return;
+    }
+
     const state: FerbToolsStorageState = await initializeState();
 
     if (!state.features.checkIn.settings.enabled) {
@@ -365,7 +380,7 @@ namespace FerbToolsBackground {
       return;
     }
 
-    record.checkoutReminderShownAt = Date.now();
+    record.checkoutReminderShownAt = now;
     state.features.checkIn.records[dayKey] = record;
     await saveStorageState(state);
     await refreshActionBadge();
@@ -534,8 +549,9 @@ namespace FerbToolsBackground {
     };
   }
 
-  function getPendingCheckoutReminder(state: FerbToolsStorageState, now: number): NoticeDailyRecord | null {
-    const pendingRecords: NoticeDailyRecord[] = Object.values(state.features.checkIn.records)
+  function getPendingCheckoutReminder(state: FerbToolsStorageState, now: number, dayKey: string = getDayKey(now)): NoticeDailyRecord | null {
+    const pendingRecords: NoticeDailyRecord[] = [state.features.checkIn.records[dayKey]]
+      .filter((record: NoticeDailyRecord | undefined): record is NoticeDailyRecord => Boolean(record))
       .filter((record: NoticeDailyRecord): boolean => {
         return Boolean(record.checkInAt && record.checkoutReminderDueAt && record.checkoutReminderDueAt <= now && !record.checkoutReminderShownAt);
       })
@@ -546,8 +562,9 @@ namespace FerbToolsBackground {
     return pendingRecords[0] ?? null;
   }
 
-  function getActiveWorkRecord(state: FerbToolsStorageState, now: number): NoticeDailyRecord | null {
-    const activeRecords: NoticeDailyRecord[] = Object.values(state.features.checkIn.records)
+  function getActiveWorkRecord(state: FerbToolsStorageState, now: number, dayKey: string = getDayKey(now)): NoticeDailyRecord | null {
+    const activeRecords: NoticeDailyRecord[] = [state.features.checkIn.records[dayKey]]
+      .filter((record: NoticeDailyRecord | undefined): record is NoticeDailyRecord => Boolean(record))
       .filter((record: NoticeDailyRecord): boolean => {
         return Boolean(record.checkInAt && record.checkoutReminderDueAt && record.checkoutReminderDueAt > now);
       })
@@ -676,6 +693,12 @@ namespace FerbToolsBackground {
     return showNotice(tabId, message);
   }
 
+  async function dismissCheckInNotice(tabId: number): Promise<void> {
+    await sendMessageToTab(tabId, {
+      type: 'DISMISS_CHECKIN_NOTICE',
+    });
+  }
+
   async function showNotice(tabId: number, message: NoticeShowDailyCheckInPromptMessage | NoticeShowCheckoutReminderMessage): Promise<boolean> {
     const scriptInjected: boolean = await injectContentScript(tabId);
 
@@ -705,7 +728,7 @@ namespace FerbToolsBackground {
     });
   }
 
-  async function sendMessageToTab(tabId: number, message: NoticeShowDailyCheckInPromptMessage | NoticeShowCheckoutReminderMessage): Promise<boolean> {
+  async function sendMessageToTab(tabId: number, message: NoticeShowDailyCheckInPromptMessage | NoticeShowCheckoutReminderMessage | NoticeDismissCheckInNoticeMessage): Promise<boolean> {
     return new Promise((resolve: (value: boolean) => void): void => {
       chrome.tabs.sendMessage(tabId, message, (): void => {
         if (chrome.runtime.lastError) {
@@ -737,6 +760,11 @@ namespace FerbToolsBackground {
     let changed: boolean = false;
 
     Object.entries(state.features.checkIn.records).forEach(([dayKey, record]: [string, NoticeDailyRecord]): void => {
+      if (dayKey < getDayKey(now) && !record.checkInAt) {
+        changed = true;
+        return;
+      }
+
       if (dayKey >= cutoffDayKey) {
         nextRecords[dayKey] = record;
         return;
@@ -770,6 +798,15 @@ namespace FerbToolsBackground {
 
   function isLateCheckInTime(timestamp: number, settings: NoticeSettings): boolean {
     return timestamp > getLocalTimeTimestamp(timestamp, settings.latestCheckInTime);
+  }
+
+  function shouldShowDailyCheckInPrompt(timestamp: number, settings: NoticeSettings): boolean {
+    return !isWeekend(timestamp) && timestamp <= getLocalTimeTimestamp(timestamp, settings.latestCheckInTime);
+  }
+
+  function isWeekend(timestamp: number): boolean {
+    const day: number = new Date(timestamp).getDay();
+    return day < MONDAY_DAY || day > FRIDAY_DAY;
   }
 
   function getLocalTimeTimestamp(timestamp: number, time: string): number {

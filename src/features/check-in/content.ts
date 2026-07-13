@@ -51,6 +51,11 @@ function bootstrapContentScript(): void {
 
     if (isShowCheckoutReminderMessage(message)) {
       renderCheckoutReminder(state, message);
+      return;
+    }
+
+    if (isDismissCheckInNoticeMessage(message)) {
+      clearNotice(state);
     }
   });
 }
@@ -664,6 +669,12 @@ function isShowCheckoutReminderMessage(
     typeof message.dueAt === "number" &&
     typeof message.workDurationMinutes === "number"
   );
+}
+
+function isDismissCheckInNoticeMessage(
+  message: unknown
+): message is NoticeDismissCheckInNoticeMessage {
+  return isRecord(message) && message.type === "DISMISS_CHECKIN_NOTICE";
 }
 
   function isRecord(value: unknown): value is Record<string, unknown> {

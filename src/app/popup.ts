@@ -1,12 +1,14 @@
 namespace FerbToolsPopup {
-  const APP_VERSION = '1.5.1';
+  const APP_VERSION = '1.9.1';
 
   document.addEventListener('DOMContentLoaded', (): void => {
     const versionElement: HTMLSpanElement = getElementById('version', HTMLSpanElement);
     const statusElement: HTMLParagraphElement = getElementById('status', HTMLParagraphElement);
     const setStatus = (status: string): void => {
-      statusElement.textContent = status;
-      statusElement.hidden = status === '';
+      const normalizedStatus: string = status.replace(/\s+/g, ' ').trim();
+      statusElement.textContent = normalizedStatus;
+      statusElement.title = normalizedStatus;
+      statusElement.hidden = normalizedStatus === '';
     };
 
     versionElement.textContent = `v${APP_VERSION}`;
@@ -35,6 +37,10 @@ namespace FerbToolsPopup {
         siteMapInput: getElementById('content-asset-site-map', HTMLTextAreaElement),
         saveButton: getElementById('content-asset-save-button', HTMLButtonElement),
         resetButton: getElementById('content-asset-reset-button', HTMLButtonElement),
+        listIdsInput: getElementById('content-asset-list-ids', HTMLTextAreaElement),
+        listFilenameInput: getElementById('content-asset-list-filename', HTMLInputElement),
+        listConcurrencyInput: getElementById('content-asset-list-concurrency', HTMLInputElement),
+        listRunButton: getElementById('content-asset-list-button', HTMLButtonElement),
       },
     });
   });

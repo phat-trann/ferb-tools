@@ -7,6 +7,10 @@ namespace FerbToolsContentAssetPopupFeature {
     siteMapInput: HTMLTextAreaElement;
     saveButton: HTMLButtonElement;
     resetButton: HTMLButtonElement;
+    listIdsInput: HTMLTextAreaElement;
+    listFilenameInput: HTMLInputElement;
+    listConcurrencyInput: HTMLInputElement;
+    listRunButton: HTMLButtonElement;
   }
 
   export interface Options {
@@ -17,11 +21,18 @@ namespace FerbToolsContentAssetPopupFeature {
   export function init(options: Options): void {
     const { elements, setStatus } = options;
     let activeRunId: string | null = null;
+    let activeRunButton: HTMLButtonElement | null = null;
+    let listSettingsSaveTimeout: number | undefined;
 
     elements.runButton.addEventListener('click', (event: MouseEvent): void => {
       event.preventDefault();
       event.stopPropagation();
       void runTool();
+    });
+
+    elements.listRunButton.addEventListener('click', (event: MouseEvent): void => {
+      event.preventDefault();
+      void runListTool();
     });
 
     elements.saveButton.addEventListener('click', (): void => {
@@ -30,6 +41,18 @@ namespace FerbToolsContentAssetPopupFeature {
 
     elements.resetButton.addEventListener('click', (): void => {
       void resetSettings();
+    });
+
+    elements.listIdsInput.addEventListener('input', (): void => {
+      scheduleListSettingsSave();
+    });
+
+    elements.listFilenameInput.addEventListener('input', (): void => {
+      scheduleListSettingsSave();
+    });
+
+    elements.listConcurrencyInput.addEventListener('input', (): void => {
+      scheduleListSettingsSave();
     });
 
     chrome.runtime.onMessage.addListener((message: unknown): void => {
@@ -46,37 +69,37 @@ namespace FerbToolsContentAssetPopupFeature {
       try {
         renderSettings(await readSettings());
       } catch (error: unknown) {
-        setStatus(error instanceof Error ? error.message : 'Không đọc được Content Asset setup.');
+        setStatus(error instanceof Error ? error.message : 'Không đọc được config.');
       }
     }
 
     async function saveSettings(): Promise<void> {
-      setSetupBusy(true, 'Đang lưu Content Asset setup...');
+      setSetupBusy(true, 'Đang lưu...');
 
       try {
         const settings: ContentAssetSettings = readSettingsFromForm();
 
         await writeSettings(settings);
         renderSettings(settings);
-        setStatus('Đã lưu Content Asset setup.');
+        setStatus('Đã lưu config.');
       } catch (error: unknown) {
-        setStatus(error instanceof Error ? error.message : 'Không lưu được Content Asset setup.');
+        setStatus(error instanceof Error ? error.message : 'Không lưu được config.');
       } finally {
         setSetupBusy(false);
       }
     }
 
     async function resetSettings(): Promise<void> {
-      setSetupBusy(true, 'Đang reset Content Asset setup...');
+      setSetupBusy(true, 'Đang reset...');
 
       try {
         const settings: ContentAssetSettings = FerbToolsContentAssetConfig.createDefaultSettings();
 
         await writeSettings(settings);
         renderSettings(settings);
-        setStatus('Đã reset Content Asset setup về mặc định.');
+        setStatus('Đã reset config.');
       } catch (error: unknown) {
-        setStatus(error instanceof Error ? error.message : 'Không reset được Content Asset setup.');
+        setStatus(error instanceof Error ? error.message : 'Không reset được config.');
       } finally {
         setSetupBusy(false);
       }
@@ -85,52 +108,116 @@ namespace FerbToolsContentAssetPopupFeature {
     async function runTool(): Promise<void> {
       const runId: string = createRunId();
       activeRunId = runId;
-      setToolBusy(true, 'Đang chạy Content Asset...');
+      activeRunButton = elements.runButton;
+      setToolBusy(elements.runButton, true, 'Đang export...');
       renderProgress(1, 'Starting');
 
       try {
         const tab: chrome.tabs.Tab | undefined = await getCurrentTab();
 
         if (!tab || typeof tab.id !== 'number' || !isInjectableUrl(tab.url)) {
-          throw new Error('Mở trang Business Manager cần export rồi chạy lại tool.');
+          throw new Error('Mở đúng Content Asset detail page.');
         }
 
-        const response: ContentAssetExportResponse = await sendTabMessage<ContentAssetExportMessage, ContentAssetExportResponse>(tab.id, {
+        const message: ContentAssetExportMessage = {
           type: 'RUN_CONTENT_ASSET_EXPORT',
           runId,
-        });
+        };
+        const response: ContentAssetExportResponse = await sendTabMessage<ContentAssetExportMessage, ContentAssetExportResponse>(tab.id, message, 'Refresh Content Asset detail page.');
 
         if (!response.success) {
-          throw new Error(response.error ?? 'Không chạy được Content Asset tool.');
+          throw new Error(response.error ?? 'Export lỗi.');
         }
 
         renderProgress(100, 'Done');
-        setStatus('Content Asset export đã bắt đầu download.');
+        setStatus('Đã bắt đầu download.');
       } catch (error: unknown) {
-        setStatus(error instanceof Error ? error.message : 'Không chạy được Content Asset tool.');
+        setStatus(error instanceof Error ? error.message : 'Export lỗi.');
       } finally {
-        setToolBusy(false);
+        setToolBusy(elements.runButton, false);
         activeRunId = null;
+        activeRunButton = null;
+      }
+    }
+
+    async function runListTool(): Promise<void> {
+      const contentIds: string[] = parseContentIds(elements.listIdsInput.value);
+      const filename: string = normalizeFilenameInput(elements.listFilenameInput.value);
+
+      if (contentIds.length === 0) {
+        setStatus('Nhập content asset ID.');
+        return;
+      }
+
+      const concurrency: number = parseConcurrency(elements.listConcurrencyInput.value);
+      const runId: string = createRunId();
+      activeRunId = runId;
+      activeRunButton = elements.listRunButton;
+      setToolBusy(elements.listRunButton, true, 'Đang export list...');
+      renderProgress(1, 'Starting');
+
+      try {
+        const tab: chrome.tabs.Tab | undefined = await getCurrentTab();
+
+        if (!tab || typeof tab.id !== 'number' || !isInjectableUrl(tab.url)) {
+          throw new Error('Mở Content Asset list page.');
+        }
+
+        await writeSettings({
+          ...readSettingsFromForm(),
+          batchConcurrency: concurrency,
+          listContentIdsText: elements.listIdsInput.value,
+          listFilename: filename,
+        });
+
+        const message: ContentAssetListExportMessage = {
+          type: 'RUN_CONTENT_ASSET_LIST_EXPORT',
+          runId,
+          contentIds,
+          concurrency,
+          filename,
+        };
+        const response: ContentAssetExportResponse = await sendTabMessage<ContentAssetListExportMessage, ContentAssetExportResponse>(tab.id, message, 'Refresh Content Asset list page.');
+
+        if (!response.success) {
+          throw new Error(response.error ?? 'Export list lỗi.');
+        }
+
+        renderProgress(100, 'Done');
+        setStatus('Đã bắt đầu download list.');
+      } catch (error: unknown) {
+        setStatus(error instanceof Error ? error.message : 'Export list lỗi.');
+      } finally {
+        setToolBusy(elements.listRunButton, false);
+        activeRunId = null;
+        activeRunButton = null;
       }
     }
 
     function renderSettings(settings: ContentAssetSettings): void {
       elements.localesInput.value = settings.allowedLocales.join(', ');
       elements.siteMapInput.value = JSON.stringify(settings.siteIdByName, null, 2);
+      elements.listIdsInput.value = settings.listContentIdsText;
+      elements.listFilenameInput.value = settings.listFilename;
+      elements.listConcurrencyInput.value = String(settings.batchConcurrency);
     }
 
     function readSettingsFromForm(): ContentAssetSettings {
       return {
         allowedLocales: parseLocales(elements.localesInput.value),
         siteIdByName: parseSiteIdMap(elements.siteMapInput.value),
+        batchConcurrency: parseConcurrency(elements.listConcurrencyInput.value),
+        listContentIdsText: elements.listIdsInput.value,
+        listFilename: normalizeFilenameInput(elements.listFilenameInput.value),
       };
     }
 
-    function setToolBusy(isBusy: boolean, status?: string): void {
+    function setToolBusy(button: HTMLButtonElement, isBusy: boolean, status?: string): void {
       elements.runButton.disabled = isBusy;
+      elements.listRunButton.disabled = isBusy;
       elements.saveButton.disabled = isBusy;
       elements.resetButton.disabled = isBusy;
-      elements.runButton.textContent = isBusy ? '0%' : 'Run';
+      button.textContent = isBusy ? '0%' : 'Run';
 
       if (status) {
         setStatus(status);
@@ -143,6 +230,10 @@ namespace FerbToolsContentAssetPopupFeature {
       elements.saveButton.disabled = isBusy;
       elements.resetButton.disabled = isBusy;
       elements.runButton.disabled = isBusy;
+      elements.listIdsInput.disabled = isBusy;
+      elements.listFilenameInput.disabled = isBusy;
+      elements.listConcurrencyInput.disabled = isBusy;
+      elements.listRunButton.disabled = isBusy;
 
       if (status) {
         setStatus(status);
@@ -151,9 +242,35 @@ namespace FerbToolsContentAssetPopupFeature {
 
     function renderProgress(percent: number, label: string): void {
       const normalizedPercent: number = Math.min(100, Math.max(0, Math.round(percent)));
+      const targetButton: HTMLButtonElement = activeRunButton ?? elements.runButton;
 
-      elements.runButton.textContent = normalizedPercent >= 100 ? 'Done' : `${normalizedPercent}%`;
+      targetButton.textContent = normalizedPercent >= 100 ? 'Done' : `${normalizedPercent}%`;
       console.log(`Content Asset: ${normalizedPercent}% - ${label}`);
+    }
+
+    function scheduleListSettingsSave(): void {
+      if (listSettingsSaveTimeout !== undefined) {
+        window.clearTimeout(listSettingsSaveTimeout);
+      }
+
+      listSettingsSaveTimeout = window.setTimeout((): void => {
+        void saveListSettings();
+      }, 300);
+    }
+
+    async function saveListSettings(): Promise<void> {
+      try {
+        const currentSettings: ContentAssetSettings = await readSettings();
+
+        await writeSettings({
+          ...currentSettings,
+          batchConcurrency: parseConcurrency(elements.listConcurrencyInput.value),
+          listContentIdsText: elements.listIdsInput.value,
+          listFilename: normalizeFilenameInput(elements.listFilenameInput.value),
+        });
+      } catch (error: unknown) {
+        console.error('Failed to save Content Asset list setup', error);
+      }
     }
   }
 
@@ -168,20 +285,45 @@ namespace FerbToolsContentAssetPopupFeature {
     const parsedValue: unknown = JSON.parse(value);
 
     if (!isRecord(parsedValue)) {
-      throw new Error('Site mapping phải là JSON object.');
+      throw new Error('Site map phải là JSON object.');
     }
 
     const siteIdByName: Record<string, string> = {};
 
     Object.entries(parsedValue).forEach(([siteName, siteId]: [string, unknown]): void => {
       if (typeof siteId !== 'string' || siteName.trim() === '' || siteId.trim() === '') {
-        throw new Error('Site mapping chỉ nhận key/value string không rỗng.');
+        throw new Error('Site map chỉ nhận string.');
       }
 
       siteIdByName[siteName] = siteId;
     });
 
     return siteIdByName;
+  }
+
+  function parseContentIds(value: string): string[] {
+    return Array.from(
+      new Set(
+        value
+          .split(/[\s,;]+/)
+          .map((contentId: string): string => contentId.trim())
+          .filter((contentId: string): boolean => contentId !== '')
+      )
+    );
+  }
+
+  function parseConcurrency(value: string): number {
+    const concurrency: number = Number(value);
+
+    if (!Number.isFinite(concurrency)) {
+      return FerbToolsContentAssetConfig.DEFAULT_BATCH_CONCURRENCY;
+    }
+
+    return Math.max(1, Math.min(10, Math.floor(concurrency)));
+  }
+
+  function normalizeFilenameInput(value: string): string {
+    return value.trim();
   }
 
   async function readSettings(): Promise<ContentAssetSettings> {
@@ -225,6 +367,9 @@ namespace FerbToolsContentAssetPopupFeature {
     return {
       allowedLocales: Array.isArray(candidate.allowedLocales) ? candidate.allowedLocales.filter((locale: unknown): locale is string => typeof locale === 'string' && locale.trim() !== '') : defaults.allowedLocales,
       siteIdByName: isRecord(candidate.siteIdByName) ? parseSiteIdMap(JSON.stringify(candidate.siteIdByName)) : defaults.siteIdByName,
+      batchConcurrency: typeof candidate.batchConcurrency === 'number' && Number.isFinite(candidate.batchConcurrency) ? Math.max(1, Math.min(10, Math.floor(candidate.batchConcurrency))) : defaults.batchConcurrency,
+      listContentIdsText: typeof candidate.listContentIdsText === 'string' ? candidate.listContentIdsText : defaults.listContentIdsText,
+      listFilename: typeof candidate.listFilename === 'string' ? candidate.listFilename : defaults.listFilename,
     };
   }
 
@@ -247,17 +392,53 @@ namespace FerbToolsContentAssetPopupFeature {
     });
   }
 
-  async function sendTabMessage<TRequest, TResponse>(tabId: number, message: TRequest): Promise<TResponse> {
+  async function sendTabMessage<TRequest, TResponse>(tabId: number, message: TRequest, fallbackError: string): Promise<TResponse> {
+    try {
+      return await sendMessageToTab<TRequest, TResponse>(tabId, message);
+    } catch (error: unknown) {
+      if (!isMissingReceiverError(error)) {
+        throw error;
+      }
+
+      await injectContentAssetContentScripts(tabId);
+      return sendMessageToTab<TRequest, TResponse>(tabId, message, fallbackError);
+    }
+  }
+
+  async function sendMessageToTab<TRequest, TResponse>(tabId: number, message: TRequest, fallbackError?: string): Promise<TResponse> {
     return new Promise((resolve: (value: TResponse) => void, reject: (reason?: unknown) => void): void => {
       chrome.tabs.sendMessage(tabId, message, (response: TResponse): void => {
         if (chrome.runtime.lastError) {
-          reject(new Error('Refresh tab hiện tại rồi chạy lại Content Asset tool.'));
+          reject(new Error(fallbackError ?? chrome.runtime.lastError.message));
           return;
         }
 
         resolve(response);
       });
     });
+  }
+
+  async function injectContentAssetContentScripts(tabId: number): Promise<void> {
+    return new Promise((resolve: () => void, reject: (reason?: unknown) => void): void => {
+      chrome.scripting.executeScript(
+        {
+          target: { tabId },
+          files: ['features/content-asset/config.js', 'features/content-asset/content-asset-export.js'],
+        },
+        (): void => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+
+          resolve();
+        }
+      );
+    });
+  }
+
+  function isMissingReceiverError(error: unknown): boolean {
+    return error instanceof Error && error.message.includes('Receiving end does not exist');
   }
 
   function isInjectableUrl(url: string | undefined): boolean {
