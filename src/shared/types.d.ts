@@ -44,6 +44,7 @@ interface NoticeShowCheckoutReminderMessage {
   dayKey: string;
   checkInAt: number;
   dueAt: number;
+  workDurationMinutes: number;
 }
 
 interface NoticeCompleteCheckInMessage {
@@ -76,6 +77,10 @@ interface NoticeClearTodayDataMessage {
 
 interface NoticeSnoozeDailyCheckInPromptMessage {
   type: "SNOOZE_DAILY_CHECKIN_PROMPT";
+}
+
+interface ContentAssetExportMessage {
+  type: "RUN_CONTENT_ASSET_EXPORT";
 }
 
 interface NoticeAcknowledgeCheckoutReminderResponse {
@@ -113,5 +118,10 @@ interface NoticeCompleteCheckInResponse {
   dueAt?: number;
   isLate?: boolean;
   lateMessage?: string;
+  error?: string;
+}
+
+interface ContentAssetExportResponse {
+  success: boolean;
   error?: string;
 }

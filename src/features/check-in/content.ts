@@ -106,10 +106,10 @@ function renderCheckoutReminder(
   applyNoticeVariant(elements, "checkout");
   elements.badge.textContent = "NHẮC CHECKOUT";
   elements.title.textContent = "Đã làm đủ giờ";
-  elements.body.textContent = "Nhớ checkout trước khi ra về.";
+  elements.body.textContent = `Đã làm đủ ${formatWorkDuration(message.workDurationMinutes)}. Nhớ checkout trước khi ra về.`;
   elements.checkInTimeField.hidden = true;
   elements.checkInTimeInput.disabled = true;
-  elements.meta.textContent = `Check in lúc ${formatTime(message.checkInAt)} • Đủ 9 giờ lúc ${formatTime(
+  elements.meta.textContent = `Check in lúc ${formatTime(message.checkInAt)} • Đủ giờ lúc ${formatTime(
     message.dueAt
   )}.`;
   elements.primaryButton.textContent = "Đã rõ";
@@ -615,6 +615,21 @@ function formatTimeInput(timestamp: number): string {
   return `${hours}:${minutes}`;
 }
 
+function formatWorkDuration(minutes: number): string {
+  const hours: number = Math.floor(minutes / 60);
+  const remainingMinutes: number = minutes % 60;
+
+  if (hours === 0) {
+    return `${remainingMinutes} phút`;
+  }
+
+  if (remainingMinutes === 0) {
+    return `${hours} giờ`;
+  }
+
+  return `${hours} giờ ${remainingMinutes} phút`;
+}
+
 function isTimeInput(value: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
@@ -646,7 +661,8 @@ function isShowCheckoutReminderMessage(
     message.type === "SHOW_CHECKOUT_REMINDER" &&
     typeof message.dayKey === "string" &&
     typeof message.checkInAt === "number" &&
-    typeof message.dueAt === "number"
+    typeof message.dueAt === "number" &&
+    typeof message.workDurationMinutes === "number"
   );
 }
 

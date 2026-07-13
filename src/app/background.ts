@@ -283,7 +283,7 @@ namespace FerbToolsBackground {
     const pendingReminder: NoticeDailyRecord | null = getPendingCheckoutReminder(state, now);
 
     if (pendingReminder) {
-      const reminderShown: boolean = await showCheckoutReminder(tab.id, pendingReminder);
+      const reminderShown: boolean = await showCheckoutReminder(tab.id, pendingReminder, state.features.checkIn.settings);
 
       if (reminderShown) {
         pendingReminder.checkoutReminderShownAt = now;
@@ -358,7 +358,7 @@ namespace FerbToolsBackground {
       return;
     }
 
-    const reminderShown: boolean = await showCheckoutReminder(activeTab.id, record);
+    const reminderShown: boolean = await showCheckoutReminder(activeTab.id, record, state.features.checkIn.settings);
 
     if (!reminderShown) {
       await refreshActionBadge();
@@ -634,18 +634,18 @@ namespace FerbToolsBackground {
       return {
         text: 'OUT',
         backgroundColor: BADGE_READY_COLOR,
-        title: withExtensionCredit(`Đã đủ 9 giờ.\nNhớ checkout trước khi ra về.\nCheck in: ${formatTime(todayRecord.checkInAt)}.\nĐủ giờ: ${formatTime(todayRecord.checkoutReminderDueAt)}.`),
+        title: withExtensionCredit(`Đã đủ ${formatWorkDuration(state.features.checkIn.settings.workDurationMinutes)}.\nNhớ checkout trước khi ra về.\nCheck in: ${formatTime(todayRecord.checkInAt)}.\nĐủ giờ: ${formatTime(todayRecord.checkoutReminderDueAt)}.`),
       };
     }
 
     const lateSuffix: string = isLateCheckInTime(now, state.features.checkIn.settings) ? ` ${LATE_CHECKIN_MESSAGE}` : '';
 
-  return {
-    text: 'IN?',
-    backgroundColor: BADGE_PENDING_COLOR,
-    title: withExtensionCredit(`Chưa check in hôm nay.${lateSuffix}`),
-  };
-}
+    return {
+      text: 'IN?',
+      backgroundColor: BADGE_PENDING_COLOR,
+      title: withExtensionCredit(`Chưa check in hôm nay.${lateSuffix}`),
+    };
+  }
 
   async function showDailyCheckInPrompt(tabId: number, dayKey: string, settings: NoticeSettings): Promise<boolean> {
     const now: number = Date.now();
@@ -660,7 +660,7 @@ namespace FerbToolsBackground {
     return showNotice(tabId, message);
   }
 
-  async function showCheckoutReminder(tabId: number, record: NoticeDailyRecord): Promise<boolean> {
+  async function showCheckoutReminder(tabId: number, record: NoticeDailyRecord, settings: NoticeSettings): Promise<boolean> {
     if (!record.checkInAt || !record.checkoutReminderDueAt) {
       return false;
     }
@@ -670,6 +670,7 @@ namespace FerbToolsBackground {
       dayKey: record.dayKey,
       checkInAt: record.checkInAt,
       dueAt: record.checkoutReminderDueAt,
+      workDurationMinutes: settings.workDurationMinutes,
     };
 
     return showNotice(tabId, message);
@@ -782,17 +783,10 @@ namespace FerbToolsBackground {
   function roundCheckoutReminderTime(timestamp: number, roundingSlotMinutes: number): number {
     const date: Date = new Date(timestamp);
     const currentMinutes: number = date.getMinutes();
-    const currentSeconds: number = date.getSeconds();
-    const currentMilliseconds: number = date.getMilliseconds();
     const remainderMinutes: number = currentMinutes % roundingSlotMinutes;
-    const isExactlyOnSlot: boolean = remainderMinutes === 0 && currentSeconds === 0 && currentMilliseconds === 0;
-
-    if (isExactlyOnSlot) {
-      return date.getTime();
-    }
 
     if (remainderMinutes === 0) {
-      date.setMinutes(currentMinutes + roundingSlotMinutes, 0, 0);
+      date.setSeconds(0, 0);
       return date.getTime();
     }
 
@@ -808,7 +802,14 @@ namespace FerbToolsBackground {
     const totalMinutes: number = Math.max(0, Math.ceil(remainingMs / (60 * 1000)));
 
     if (totalMinutes >= 60) {
-      return `${Math.floor(totalMinutes / 60)}h`;
+      const hours: number = Math.floor(totalMinutes / 60);
+      const minutes: number = totalMinutes % 60;
+
+      if (hours >= 10) {
+        return `${hours}h`;
+      }
+
+      return `${hours}:${String(minutes).padStart(2, '0')}`;
     }
 
     return `${totalMinutes}m`;
@@ -830,6 +831,10 @@ namespace FerbToolsBackground {
     return `${hours} giờ ${minutes} phút`;
   }
 
+  function formatWorkDuration(minutes: number): string {
+    return formatDuration(minutesToMilliseconds(minutes));
+  }
+
   function formatTime(timestamp: number): string {
     return new Intl.DateTimeFormat('vi-VN', {
       hour: '2-digit',
@@ -845,15 +850,15 @@ namespace FerbToolsBackground {
     return `${hours}:${minutes}`;
   }
 
-function ensureBadgeRefreshAlarm(): void {
-  chrome.alarms.create(BADGE_REFRESH_ALARM, {
-    periodInMinutes: BADGE_REFRESH_PERIOD_MINUTES,
-  });
-}
+  function ensureBadgeRefreshAlarm(): void {
+    chrome.alarms.create(BADGE_REFRESH_ALARM, {
+      periodInMinutes: BADGE_REFRESH_PERIOD_MINUTES,
+    });
+  }
 
-function withExtensionCredit(message: string): string {
-  return `${EXTENSION_NAME} • ${EXTENSION_CREDIT}\n${message}`;
-}
+  function withExtensionCredit(message: string): string {
+    return `${EXTENSION_NAME} • ${EXTENSION_CREDIT}\n${message}`;
+  }
 
   function isInjectableUrl(url: string | undefined): boolean {
     if (!url) {

@@ -1,4 +1,5 @@
-(() => {
+// @ts-nocheck
+namespace FerbToolsContentAssetExport {
   const bmUrls = {
     libraries: '/on/demandware.store/Sites-Site/default/ViewContentSharedLibrary-List?SelectedMenuItem=content&CurrentMenuItemId=content',
   };
@@ -399,8 +400,28 @@
     });
   }
 
-  window.generateContentAsset = () => {
-    buildContentAsset().then((result) => {
+  chrome.runtime.onMessage.addListener((message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: ContentAssetExportResponse) => void): boolean | void => {
+    if (!isContentAssetExportMessage(message)) {
+      return;
+    }
+
+    generateContentAsset()
+      .then((): void => {
+        sendResponse({ success: true });
+      })
+      .catch((error: unknown): void => {
+        console.error('Failed to generate content asset', error);
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unable to generate content asset.',
+        });
+      });
+
+    return true;
+  });
+
+  async function generateContentAsset(): Promise<void> {
+    return buildContentAsset().then((result) => {
       const blob = new Blob([result.xml], { type: 'text/xml' });
       const button = document.createElement('a');
 
@@ -413,7 +434,9 @@
       button.click();
       console.log('Content asset generated and download initiated.');
     });
-  };
+  }
 
-  generateContentAsset();
-})();
+  function isContentAssetExportMessage(message: unknown): message is ContentAssetExportMessage {
+    return typeof message === 'object' && message !== null && (message as Record<string, unknown>).type === 'RUN_CONTENT_ASSET_EXPORT';
+  }
+}
