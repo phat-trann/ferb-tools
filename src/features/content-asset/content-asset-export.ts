@@ -15,7 +15,6 @@ namespace FerbToolsContentAssetExport {
   type ContentAssetGroups = Record<ContentAssetGroupKey, ContentAssetItem[]>;
 
   interface LibraryInfo {
-    shared: boolean;
     xml?: string;
   }
 
@@ -352,7 +351,7 @@ namespace FerbToolsContentAssetExport {
       reportProgress(runId, 84, 'Rendering XML');
     }
     const foldersXml: string = renderers.folder(folderNodes);
-    const libraryOpen: string = libraryInfo.shared && libraryInfo.xml ? libraryInfo.xml : '<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31">';
+    const libraryOpen: string = libraryInfo.xml ?? '<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31">';
     const contentId: string = getContentId(context.doc);
     const groupedXml: string = await renderGroupedXml(grouped);
 
@@ -825,18 +824,17 @@ namespace FerbToolsContentAssetExport {
     const selectedNode: HTMLElement | undefined = detailNodes.find((node: HTMLElement): boolean => node.innerHTML.includes(repositoryUuid ?? ''));
 
     if (!selectedNode || !selectedNode.parentElement?.children) {
-      return { shared: false };
+      return {};
     }
 
     const rowChildren: HTMLCollection = selectedNode.parentElement.children;
-    const libraryType: string = (rowChildren[1] as HTMLElement).innerText;
+    const libraryId: string = (rowChildren[0] as HTMLElement).innerText.trim();
 
-    return libraryType.indexOf('Shared') > -1
+    return libraryId
       ? {
-          xml: `<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31" library-id="${(rowChildren[0] as HTMLElement).innerText.trim()}">\n`,
-          shared: true,
+          xml: `<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31" library-id="${escapeXmlValue(libraryId)}">\n`,
         }
-      : { shared: false };
+      : {};
   }
 
   function isLocalized(fieldNode: Element): boolean {

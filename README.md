@@ -10,7 +10,7 @@ Current tools:
 
 ## Version
 
-Current version: `1.10.4`
+Current version: `1.11.0`
 
 Versioning uses semantic versioning:
 
@@ -19,6 +19,11 @@ Versioning uses semantic versioning:
 - Major: breaking storage, package, or workflow change.
 
 ## Version Notes
+
+### 1.11.0
+
+- Includes the library ID on exported Content Asset List library tags.
+- Appends each Jira task estimation to Work Plan entries and treats `0 minutes` as `30 minutes`.
 
 ### 1.10.4
 

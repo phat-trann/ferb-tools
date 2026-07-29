@@ -7,6 +7,7 @@ namespace FerbToolsJiraReportContentFeature {
     parent: string;
     summary: string;
     status: string;
+    estimation: string;
     startDate: Date | null;
     dueDate: Date | null;
   }
@@ -144,6 +145,7 @@ namespace FerbToolsJiraReportContentFeature {
       const parentCell: HTMLTableCellElement | null = row.querySelector('td.parent');
       const summaryLink: HTMLAnchorElement | null = row.querySelector('td.summary a.issue-link');
       const statusCell: HTMLTableCellElement | null = row.querySelector('td.status');
+      const estimationCell: HTMLTableCellElement | null = row.querySelector('td.timeestimate');
       const startCell: HTMLTableCellElement | null = row.querySelector('td.customfield_10015');
       const dueCell: HTMLTableCellElement | null = row.querySelector('td.duedate');
 
@@ -153,6 +155,7 @@ namespace FerbToolsJiraReportContentFeature {
         parent: normalizeText(parentCell?.textContent),
         summary: normalizeText(summaryLink?.textContent),
         status: normalizeText(statusCell?.textContent),
+        estimation: normalizeEstimation(estimationCell?.textContent),
         startDate: parseJiraDate(startCell?.textContent),
         dueDate: parseJiraDate(dueCell?.textContent),
       };
@@ -228,6 +231,10 @@ namespace FerbToolsJiraReportContentFeature {
       parts.push(row.summary);
     }
 
+    if (row.estimation) {
+      parts.push(row.estimation);
+    }
+
     return `${buildTicketLink(row)}: ${parts.map(escapeHtml).join(' - ')}`;
   }
 
@@ -237,6 +244,11 @@ namespace FerbToolsJiraReportContentFeature {
 
   function normalizeText(value: string | null | undefined): string {
     return (value ?? '').replace(/\s+/g, ' ').trim();
+  }
+
+  function normalizeEstimation(value: string | null | undefined): string {
+    const estimation: string = normalizeText(value);
+    return /^0 minutes$/i.test(estimation) ? '30 minutes' : estimation;
   }
 
   function parseJiraDate(value: string | null | undefined): Date | null {
