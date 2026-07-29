@@ -24,6 +24,7 @@ Versioning uses semantic versioning:
 
 - Uses the first content asset to determine the shared library wrapper for Content Asset List exports, with the active list library as fallback when fetched HTML lacks UI state.
 - Displays Jira Work Plan estimations in bold with an `Est:` prefix.
+- Reads the popup version from the extension manifest to keep the displayed version synchronized.
 
 ### 1.11.0
 
