@@ -10,7 +10,7 @@ Current tools:
 
 ## Version
 
-Current version: `1.11.0`
+Current version: `1.11.1`
 
 Versioning uses semantic versioning:
 
@@ -19,6 +19,11 @@ Versioning uses semantic versioning:
 - Major: breaking storage, package, or workflow change.
 
 ## Version Notes
+
+### 1.11.1
+
+- Uses the first content asset to determine the shared library wrapper for Content Asset List exports, with the active list library as fallback when fetched HTML lacks UI state.
+- Displays Jira Work Plan estimations in bold with an `Est:` prefix.
 
 ### 1.11.0
 

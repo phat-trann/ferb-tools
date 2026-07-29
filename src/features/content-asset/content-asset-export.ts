@@ -15,6 +15,7 @@ namespace FerbToolsContentAssetExport {
   type ContentAssetGroups = Record<ContentAssetGroupKey, ContentAssetItem[]>;
 
   interface LibraryInfo {
+    shared: boolean;
     xml?: string;
   }
 
@@ -277,14 +278,14 @@ namespace FerbToolsContentAssetExport {
     let searchedItems = 0;
     let completedItems = 0;
     const itemLimiter: TaskLimiter = createTaskLimiter(concurrency);
-    const fragmentTasks: Promise<ContentAssetFragment>[] = uniqueContentIds.map((contentId: string): Promise<ContentAssetFragment> => {
+    const fragmentTasks: Promise<ContentAssetFragment>[] = uniqueContentIds.map((contentId: string, index: number): Promise<ContentAssetFragment> => {
       return itemLimiter(async (): Promise<ContentAssetFragment> => {
         reportProgress(runId, getSearchProgress(searchedItems, uniqueContentIds.length), `Searching ${contentId}`);
         const detailUrl: string = await findContentAssetDetailUrl(listPageUrl, contentId);
         searchedItems += 1;
         reportProgress(runId, getSearchProgress(searchedItems, uniqueContentIds.length), `Found ${searchedItems}/${uniqueContentIds.length}`);
         const detailDoc: Document = await fetchHtmlDocument(detailUrl);
-        const fragment: ContentAssetFragment = await buildContentAssetFragment(createBuildContext(detailDoc, detailUrl));
+        const fragment: ContentAssetFragment = await buildContentAssetFragment(createBuildContext(detailDoc, detailUrl), undefined, index === 0);
 
         completedItems += 1;
         reportProgress(runId, getBuildProgress(completedItems, uniqueContentIds.length), `Exported ${completedItems}/${uniqueContentIds.length}`);
@@ -295,7 +296,16 @@ namespace FerbToolsContentAssetExport {
     const fragments: ContentAssetFragment[] = await Promise.all(fragmentTasks);
 
     reportProgress(runId, 94, 'Rendering XML');
-    const libraryOpen: string = fragments[0]?.libraryOpen ?? '<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31">';
+    let libraryOpen: string = fragments[0]?.libraryOpen ?? renderLibraryOpen({ shared: false });
+
+    if (!hasLibraryId(libraryOpen)) {
+      const listLibraryOpen: string = renderLibraryOpen(await fetchLibraryInfo(listContext));
+
+      if (hasLibraryId(listLibraryOpen)) {
+        libraryOpen = listLibraryOpen;
+      }
+    }
+
     const xml: string = renderLibraryXml(libraryOpen, fragments.map((fragment: ContentAssetFragment): string => fragment.contentXml).join('\n'));
     const exportFilename: string = normalizeExportFilename(filename) || (uniqueContentIds.length === 1 ? uniqueContentIds[0] : `content-assets-${formatTimestampForFilename(new Date())}`);
 
@@ -316,7 +326,7 @@ namespace FerbToolsContentAssetExport {
     };
   }
 
-  async function buildContentAssetFragment(context: BuildContext, runId?: string): Promise<ContentAssetFragment> {
+  async function buildContentAssetFragment(context: BuildContext, runId?: string, includeLibraryInfo = true): Promise<ContentAssetFragment> {
     const localeSelect: HTMLSelectElement = requireElementFromDocument(context.doc, '[name="LocaleId"]', HTMLSelectElement);
     const contentUUID: HTMLInputElement = requireElementFromDocument(context.doc, '[name="ContentUUID"]', HTMLInputElement);
     const localeForm: HTMLFormElement = requireElementFromDocument(context.doc, 'form[name="localeForm"]', HTMLFormElement);
@@ -346,12 +356,13 @@ namespace FerbToolsContentAssetExport {
     if (runId) {
       reportProgress(runId, 72, 'Fetching library data');
     }
-    const [libraryInfo, folderNodes]: [LibraryInfo, Element[]] = await Promise.all([fetchLibraryInfo(context), fetchFolderLinks(context)]);
+    const libraryInfoPromise: Promise<LibraryInfo> = includeLibraryInfo ? fetchLibraryInfo(context) : Promise.resolve({ shared: false });
+    const [libraryInfo, folderNodes]: [LibraryInfo, Element[]] = await Promise.all([libraryInfoPromise, fetchFolderLinks(context)]);
     if (runId) {
       reportProgress(runId, 84, 'Rendering XML');
     }
     const foldersXml: string = renderers.folder(folderNodes);
-    const libraryOpen: string = libraryInfo.xml ?? '<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31">';
+    const libraryOpen: string = renderLibraryOpen(libraryInfo);
     const contentId: string = getContentId(context.doc);
     const groupedXml: string = await renderGroupedXml(grouped);
 
@@ -621,6 +632,14 @@ namespace FerbToolsContentAssetExport {
     return ['<?xml version="1.0" encoding="UTF-8"?>\n', ensureTrailingNewline(libraryOpen), contentXml, contentXml.endsWith('\n') ? '' : '\n', '</library>'].join('');
   }
 
+  function renderLibraryOpen(libraryInfo: LibraryInfo): string {
+    return libraryInfo.shared && libraryInfo.xml ? libraryInfo.xml : '<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31">';
+  }
+
+  function hasLibraryId(libraryOpen: string): boolean {
+    return /\blibrary-id\s*=/.test(libraryOpen);
+  }
+
   function ensureTrailingNewline(value: string): string {
     return value.endsWith('\n') ? value : `${value}\n`;
   }
@@ -824,17 +843,18 @@ namespace FerbToolsContentAssetExport {
     const selectedNode: HTMLElement | undefined = detailNodes.find((node: HTMLElement): boolean => node.innerHTML.includes(repositoryUuid ?? ''));
 
     if (!selectedNode || !selectedNode.parentElement?.children) {
-      return {};
+      return { shared: false };
     }
 
     const rowChildren: HTMLCollection = selectedNode.parentElement.children;
-    const libraryId: string = (rowChildren[0] as HTMLElement).innerText.trim();
+    const libraryType: string = (rowChildren[1] as HTMLElement).innerText;
 
-    return libraryId
+    return libraryType.indexOf('Shared') > -1
       ? {
-          xml: `<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31" library-id="${escapeXmlValue(libraryId)}">\n`,
+          xml: `<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31" library-id="${(rowChildren[0] as HTMLElement).innerText.trim()}">\n`,
+          shared: true,
         }
-      : {};
+      : { shared: false };
   }
 
   function isLocalized(fieldNode: Element): boolean {

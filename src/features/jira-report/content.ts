@@ -231,11 +231,10 @@ namespace FerbToolsJiraReportContentFeature {
       parts.push(row.summary);
     }
 
-    if (row.estimation) {
-      parts.push(row.estimation);
-    }
+    const taskText: string = parts.map(escapeHtml).join(' - ');
+    const estimationHtml: string = row.estimation ? `${taskText ? ' - ' : ''}<strong>Est: ${escapeHtml(row.estimation)}</strong>` : '';
 
-    return `${buildTicketLink(row)}: ${parts.map(escapeHtml).join(' - ')}`;
+    return `${buildTicketLink(row)}: ${taskText}${estimationHtml}`;
   }
 
   function buildTicketLineForResult(row: JiraIssueRow): string {
