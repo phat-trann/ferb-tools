@@ -6,11 +6,13 @@ Current tools:
 
 - Check-in Reminder: stores today's check-in time, computes the checkout reminder, rounds the checkout time by the configured slot, and shows action badge status.
 - Content Asset Export: sends a message to `src/features/content-asset/content-asset-export.ts` on the current Business Manager tab.
-- Jira Report: generates Work Plan and Result HTML from the current Jira dashboard for Teams.
+- Content Asset List Export: exports multiple SFCC content assets into one library XML file.
+- Jira Worklog: loads the signed-in Jira user's monthly worklogs and totals them by ticket and day.
+- Jira Report: generates Work Plan and Result HTML entirely from Jira REST API v3 using configurable JQL.
 
 ## Version
 
-Current version: `1.12.0`
+Current version: `1.15.0`
 
 Versioning uses semantic versioning:
 
@@ -19,6 +21,27 @@ Versioning uses semantic versioning:
 - Major: breaking storage, package, or workflow change.
 
 ## Version Notes
+
+### 1.15.0
+
+- Moves Jira Report ticket loading entirely from dashboard HTML to Jira REST API v3.
+- Adds configurable My tasks and Today Done JQL in the Settings drawer, with current-user defaults.
+- Paginates `/rest/api/3/search/jql` results and maps parent, status category, due date, and remaining estimate from API fields.
+- Allows Jira Report generation from any signed-in page on the configured Jira site instead of requiring a dashboard.
+
+### 1.14.0
+
+- Moves long-lived tool configuration into one Settings drawer opened from the header gear icon.
+- Uses `/rest/api/3/myself` for the Jira Report name and keeps only the report role, such as `DEV`, configurable.
+- Migrates the previous Jira Report Owner setting to the new Role setting.
+
+### 1.13.0
+
+- Adds Jira Worklog with configurable site URL, month, and parallel request count.
+- Uses the active Jira session and `/rest/api/3/myself` so only the signed-in user's worklogs are loaded without storing an API token.
+- Totals monthly worklogs by ticket and calendar day, and restores the latest result from local storage.
+- Displays worklog durations as hours and minutes instead of decimal hours.
+- Excludes macOS `.DS_Store` metadata from production ZIP packages.
 
 ### 1.12.0
 

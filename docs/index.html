@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description"
-    content="FerbTools v1.12.0 is a Chrome MV3 toolkit for check-in reminders, SFCC content asset exports, and Jira Work Plan and Result reports. Made by Ferb.">
+    content="FerbTools v1.15.0 is a Chrome MV3 toolkit for check-in reminders, SFCC content asset exports, personal Jira worklogs, and API-powered Work Plan and Result reports. Made by Ferb.">
   <link rel="icon" type="image/png" sizes="128x128" href="./assets/icon-128.png">
   <link rel="apple-touch-icon" href="./assets/icon-128.png">
   <title>FerbTools - Chrome Extension Toolkit</title>
@@ -196,7 +196,7 @@
 
     .badge-row {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 10px;
       margin-bottom: 24px;
     }
@@ -360,7 +360,7 @@
           <img src="./assets/icon-128.png" width="44" height="44" alt="" aria-hidden="true">
         </span>
         <span>FerbTools</span>
-        <span class="brand-version">v1.12.0</span>
+        <span class="brand-version">v1.15.0</span>
       </a>
       <div class="nav-links">
         <a href="https://github.com/phat-trann/ferb-tools" rel="noreferrer" target="_blank"
@@ -382,11 +382,11 @@
 
     <section id="top" class="hero">
       <div>
-        <p class="eyebrow">Chrome MV3 toolkit · Version 1.12.0</p>
+        <p class="eyebrow">Chrome MV3 toolkit · Version 1.15.0</p>
         <h1>Check in. Export content. Report work.</h1>
         <p class="lead">
-          FerbTools brings daily check-in reminders, SFCC Content Asset XML exports, batch content exports, and Jira
-          Work Plan and Result reports into one compact Chrome extension popup.
+          FerbTools brings daily check-in reminders, SFCC Content Asset XML exports, batch content exports, personal
+          Jira worklog totals, and Work Plan and Result reports into one compact Chrome extension popup.
         </p>
         <div class="actions">
           <a class="button primary" href="https://github.com/phat-trann/ferb-tools/releases" rel="noreferrer"
@@ -409,6 +409,7 @@
           <span class="status-badge off">IN</span>
           <span class="status-badge pending">XML</span>
           <span class="status-badge countdown">LIST</span>
+          <span class="status-badge countdown">WORK</span>
           <span class="status-badge ready">JIRA</span>
         </div>
         <div class="setup-panel">
@@ -425,6 +426,10 @@
             <span class="setup-value">Batch</span>
           </div>
           <div class="setup-field">
+            <span>Jira Worklog</span>
+            <span class="setup-value">My hours</span>
+          </div>
+          <div class="setup-field">
             <span>Jira Report</span>
             <span class="setup-value">Plan + Result</span>
           </div>
@@ -433,8 +438,8 @@
     </section>
 
     <section id="features" class="section">
-      <p class="eyebrow">Current tools · v1.12.0</p>
-      <h2>Four workflows, one focused popup.</h2>
+      <p class="eyebrow">Current tools · v1.15.0</p>
+      <h2>Five workflows, one focused popup.</h2>
       <div class="grid">
         <article class="card">
           <h3>Check-in Reminder</h3>
@@ -458,23 +463,30 @@
             wrapper from the first content with active-list fallback.</p>
         </article>
         <article class="card">
+          <h3>Jira Worklog</h3>
+          <p>Uses the active signed-in Jira session to identify the current user and load that user's worklogs for a
+            configured month.</p>
+          <p class="detail">Totals time by ticket and calendar day in hours and minutes, supports configurable parallel
+            requests, restores the last result, and never stores an API token.</p>
+        </article>
+        <article class="card">
           <h3>Jira Work Plan</h3>
-          <p>Reads the Jira “My tasks” dashboard table and groups open tickets into delayed, due this week, and due
-            today sections.</p>
+          <p>Loads the configured “My tasks” JQL through Jira REST API v3 and groups open tickets into delayed, due
+            this week, and due today sections.</p>
           <p class="detail">Each task includes its estimate in bold; a Jira value of 0 minutes is normalized to 30
-            minutes.</p>
+            minutes. Report headings use the signed-in user's Jira API display name plus the configured role.</p>
         </article>
         <article class="card">
           <h3>Jira Result</h3>
-          <p>Reads “Today Done”, lists completed tasks, and reports the current open-ticket count in copy-ready HTML
-            and plain text.</p>
+          <p>Loads the configured “Today Done” JQL, lists completed tasks, and reports the current open-ticket count
+            in copy-ready HTML and plain text.</p>
           <p class="detail">Work Plan and Result previews remain editable and the most recently generated report is
             restored when the popup reopens.</p>
         </article>
         <article class="card">
           <h3>Saved configuration</h3>
-          <p>Tool settings live in Chrome local storage, including check-in preferences, Content Asset setup, batch
-            inputs, and the Jira report Owner shared by Work Plan and Result.</p>
+          <p>Long-lived tool settings are grouped in one drawer behind the header gear icon, including check-in
+            preferences, Content Asset setup, Jira site/concurrency, Jira Report role, and both report JQL queries.</p>
           <p class="detail">The popup reads its displayed version directly from the extension manifest to stay aligned
             with each build.</p>
         </article>
@@ -511,7 +523,7 @@
     </section>
 
     <footer class="footer">
-      FerbTools v1.12.0. Made by Ferb.
+      FerbTools v1.15.0. Made by Ferb.
     </footer>
   </main>
 </body>

@@ -1,161 +1,225 @@
 namespace FerbToolsJiraReportContentFeature {
-  const WINDOW_FLAG = '__ferbToolsJiraReportBootstrappedV3__';
+  const WINDOW_FLAG = '__ferbToolsJiraReportBootstrappedV5__';
+  const PAGE_SIZE = 100;
+  const ISSUE_FIELDS: string[] = ['key', 'summary', 'status', 'timeestimate', 'duedate', 'parent'];
 
   interface JiraIssueRow {
     key: string;
     keyUrl: string;
     parent: string;
     summary: string;
-    status: string;
+    isDone: boolean;
     estimation: string;
-    startDate: Date | null;
     dueDate: Date | null;
   }
-
-  interface JiraReportConfig {
-    myTasksTitle: string;
-    todayDoneTitle: string;
-  }
-
-  const CONFIG: JiraReportConfig = {
-    myTasksTitle: 'My tasks',
-    todayDoneTitle: 'Today Done',
-  };
 
   if (!(window as unknown as Record<string, unknown>)[WINDOW_FLAG]) {
     (window as unknown as Record<string, unknown>)[WINDOW_FLAG] = true;
 
-    chrome.runtime.onMessage.addListener((message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: JiraReportResponse) => void): undefined => {
-      if (!isGenerateMessage(message)) {
-        return undefined;
-      }
+    chrome.runtime.onMessage.addListener(
+      (
+        message: unknown,
+        _sender: chrome.runtime.MessageSender,
+        sendResponse: (response: JiraReportResponse) => void
+      ): boolean | void => {
+        if (!isGenerateMessage(message)) {
+          return;
+        }
 
-      try {
-        sendResponse({
-          success: true,
-          report: generateReportsHTML(message.settings),
-        });
-      } catch (error: unknown) {
-        sendResponse({
-          success: false,
-          error: error instanceof Error ? error.message : 'Generate Jira report lỗi.',
-        });
-      }
+        generateReportsHTML(message.settings)
+          .then((report: JiraReportResult): void => {
+            sendResponse({ success: true, report });
+          })
+          .catch((error: unknown): void => {
+            console.error('Failed to generate Jira report from API', error);
+            sendResponse({
+              success: false,
+              error: error instanceof Error ? error.message : 'Generate Jira report lỗi.',
+            });
+          });
 
-      return undefined;
-    });
+        return true;
+      }
+    );
   }
 
-  function generateReportsHTML(settings: JiraReportSettings): JiraReportResult {
-    const map: Record<string, HTMLTableElement> = buildIssueTableMapByTitle();
-    const myTasksTable: HTMLTableElement | null = map[normalizeText(CONFIG.myTasksTitle).toLowerCase()] ?? null;
-    const todayDoneTable: HTMLTableElement | null = map[normalizeText(CONFIG.todayDoneTitle).toLowerCase()] ?? null;
-
-    const myTaskRows: JiraIssueRow[] = extractRowsFromTable(myTasksTable);
-    const todayDoneRows: JiraIssueRow[] = extractRowsFromTable(todayDoneTable);
-
+  async function generateReportsHTML(settings: JiraReportSettings): Promise<JiraReportResult> {
+    const [myself, myTaskRows, todayDoneRows]: [Record<string, unknown>, JiraIssueRow[], JiraIssueRow[]] = await Promise.all([
+      fetchJiraRecord('/rest/api/3/myself'),
+      searchIssues(settings.myTasksJql),
+      searchIssues(settings.todayDoneJql),
+    ]);
+    const displayName: string = readRequiredString(myself.displayName, 'Jira API không trả về display name của user hiện tại.');
+    const reportOwner: string = [displayName, normalizeText(settings.role)].filter(Boolean).join(' ');
     const today: Date = startOfDay(new Date());
     const tomorrow: Date = addDays(today, 1);
     const weekStart: Date = startOfWeekMonday(today);
     const nextWeekStart: Date = addDays(weekStart, 7);
-
     const delayed: JiraIssueRow[] = [];
     const needToday: JiraIssueRow[] = [];
     const thisWeekInProgress: JiraIssueRow[] = [];
     let openCount = 0;
 
     myTaskRows.forEach((row: JiraIssueRow): void => {
-      const isDone: boolean = isDoneStatus(row.status);
-      if (!isDone) {
+      if (!row.isDone) {
         openCount += 1;
       }
 
       const due: Date | null = row.dueDate;
-      if (!due) {
+      if (!due || row.isDone) {
         return;
       }
 
       const dueTime: number = due.getTime();
-
-      if (!isDone && dueTime < today.getTime()) {
+      if (dueTime < today.getTime()) {
         delayed.push(row);
       }
 
-      if (!isDone && dueTime >= today.getTime() && dueTime < tomorrow.getTime()) {
+      if (dueTime >= today.getTime() && dueTime < tomorrow.getTime()) {
         needToday.push(row);
       }
 
-      if (!isDone && dueTime >= weekStart.getTime() && dueTime < nextWeekStart.getTime() && dueTime >= today.getTime()) {
+      if (dueTime >= weekStart.getTime() && dueTime < nextWeekStart.getTime() && dueTime >= today.getTime()) {
         thisWeekInProgress.push(row);
       }
     });
 
     const todayText: string = formatDateDDMMYYYY(today);
-    const warnings: string[] = [];
-
-    if (!myTasksTable) {
-      warnings.push('Không tìm thấy bảng My tasks.');
-    }
-
-    if (!todayDoneTable) {
-      warnings.push('Không tìm thấy bảng Today Done.');
-    }
-
     return {
-      workHtml: buildWorkPlanHtml(settings.owner, todayText, delayed, thisWeekInProgress, needToday),
-      resultHtml: buildResultHtml(settings.owner, todayText, todayDoneRows, myTasksTable ? openCount : null),
-      warnings,
+      workHtml: buildWorkPlanHtml(reportOwner, todayText, delayed, thisWeekInProgress, needToday),
+      resultHtml: buildResultHtml(reportOwner, todayText, todayDoneRows, openCount),
+      warnings: [],
     };
   }
 
-  function buildIssueTableMapByTitle(): Record<string, HTMLTableElement> {
-    const map: Record<string, HTMLTableElement> = {};
-    const tables: NodeListOf<HTMLTableElement> = document.querySelectorAll('table.issue-table');
-
-    tables.forEach((table: HTMLTableElement): void => {
-      const region: Element | null = table.closest('div[role="region"][id^="gadget-content-"]');
-      const labelId: string | null = region?.getAttribute('aria-labelledby') ?? null;
-
-      if (!labelId) {
-        return;
-      }
-
-      const titleElement: HTMLElement | null = document.querySelector(`div#${CSS.escape(labelId)} div[role="presentation"]`);
-      const titleText: string = normalizeText(titleElement?.innerText).toLowerCase();
-
-      if (titleText) {
-        map[titleText] = table;
-      }
-    });
-
-    return map;
-  }
-
-  function extractRowsFromTable(table: HTMLTableElement | null): JiraIssueRow[] {
-    if (!table) {
-      return [];
+  async function searchIssues(jql: string): Promise<JiraIssueRow[]> {
+    const normalizedJql: string = jql.trim();
+    if (!normalizedJql) {
+      throw new Error('Jira Report JQL không được để trống.');
     }
 
-    return Array.from(table.querySelectorAll('tbody tr.issuerow')).map((row: Element): JiraIssueRow => {
-      const keyLink: HTMLAnchorElement | null = row.querySelector('td.issuekey a.issue-link');
-      const parentCell: HTMLTableCellElement | null = row.querySelector('td.parent');
-      const summaryLink: HTMLAnchorElement | null = row.querySelector('td.summary a.issue-link');
-      const statusCell: HTMLTableCellElement | null = row.querySelector('td.status');
-      const estimationCell: HTMLTableCellElement | null = row.querySelector('td.timeestimate');
-      const startCell: HTMLTableCellElement | null = row.querySelector('td.customfield_10015');
-      const dueCell: HTMLTableCellElement | null = row.querySelector('td.duedate');
+    const issuesByKey: Map<string, JiraIssueRow> = new Map<string, JiraIssueRow>();
+    let nextPageToken: string | null = null;
 
-      return {
-        key: normalizeText(keyLink?.textContent),
-        keyUrl: keyLink?.href ?? '',
-        parent: normalizeText(parentCell?.textContent),
-        summary: normalizeText(summaryLink?.textContent),
-        status: normalizeText(statusCell?.textContent),
-        estimation: normalizeEstimation(estimationCell?.textContent),
-        startDate: parseJiraDate(startCell?.textContent),
-        dueDate: parseJiraDate(dueCell?.textContent),
+    while (true) {
+      const requestBody: Record<string, unknown> = {
+        jql: normalizedJql,
+        fields: ISSUE_FIELDS,
+        maxResults: PAGE_SIZE,
       };
+
+      if (nextPageToken) {
+        requestBody.nextPageToken = nextPageToken;
+      }
+
+      const page: Record<string, unknown> = await fetchJiraRecord('/rest/api/3/search/jql', {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+      const issues: unknown[] = Array.isArray(page.issues) ? page.issues : [];
+
+      issues.forEach((candidate: unknown): void => {
+        const row: JiraIssueRow | null = parseIssue(candidate);
+        if (row) {
+          issuesByKey.set(row.key, row);
+        }
+      });
+
+      const token: string = readOptionalString(page.nextPageToken);
+      if (page.isLast === true || !token || issues.length === 0) {
+        break;
+      }
+
+      nextPageToken = token;
+    }
+
+    return Array.from(issuesByKey.values());
+  }
+
+  function parseIssue(candidate: unknown): JiraIssueRow | null {
+    if (!isRecord(candidate)) {
+      return null;
+    }
+
+    const key: string = readOptionalString(candidate.key);
+    if (!key) {
+      return null;
+    }
+
+    const fields: Record<string, unknown> = isRecord(candidate.fields) ? candidate.fields : {};
+    const status: Record<string, unknown> = isRecord(fields.status) ? fields.status : {};
+    const statusCategory: Record<string, unknown> = isRecord(status.statusCategory) ? status.statusCategory : {};
+    const statusName: string = readOptionalString(status.name);
+    const parent: Record<string, unknown> = isRecord(fields.parent) ? fields.parent : {};
+    const parentFields: Record<string, unknown> = isRecord(parent.fields) ? parent.fields : {};
+
+    return {
+      key,
+      keyUrl: `${window.location.origin}/browse/${encodeURIComponent(key)}`,
+      parent: readOptionalString(parentFields.summary) || readOptionalString(parent.key),
+      summary: readOptionalString(fields.summary),
+      isDone: readOptionalString(statusCategory.key).toLowerCase() === 'done' || /done/i.test(statusName),
+      estimation: formatEstimation(fields.timeestimate),
+      dueDate: parseJiraDate(fields.duedate),
+    };
+  }
+
+  async function fetchJiraRecord(path: string, init?: RequestInit): Promise<Record<string, unknown>> {
+    const response: Response = await fetch(new URL(path, window.location.origin).toString(), {
+      credentials: 'include',
+      ...init,
     });
+    const loginReason: string = response.headers.get('X-Seraph-Loginreason') ?? '';
+
+    if (/AUTHENTICATED_FAILED|AUTHENTICATION_DENIED/i.test(loginReason)) {
+      throw new Error('Jira session không hợp lệ. Đăng nhập lại Jira rồi thử lại.');
+    }
+
+    if (!response.ok) {
+      const detail: string = await readJiraError(response);
+      throw new Error(`Jira API ${response.status}${detail ? `: ${detail}` : ''}`);
+    }
+
+    const contentType: string = response.headers.get('content-type') ?? '';
+    if (!contentType.toLowerCase().includes('application/json')) {
+      throw new Error('Jira không trả JSON. Kiểm tra trạng thái đăng nhập rồi thử lại.');
+    }
+
+    const body: unknown = await response.json();
+    if (!isRecord(body)) {
+      throw new Error('Jira trả về dữ liệu không hợp lệ.');
+    }
+
+    return body;
+  }
+
+  async function readJiraError(response: Response): Promise<string> {
+    try {
+      const body: unknown = await response.json();
+      if (!isRecord(body)) {
+        return '';
+      }
+
+      const messages: string[] = Array.isArray(body.errorMessages)
+        ? body.errorMessages.filter((value: unknown): value is string => typeof value === 'string')
+        : [];
+
+      if (isRecord(body.errors)) {
+        Object.values(body.errors).forEach((value: unknown): void => {
+          if (typeof value === 'string') {
+            messages.push(value);
+          }
+        });
+      }
+
+      return messages.join(' ') || readOptionalString(body.message);
+    } catch (_error: unknown) {
+      return '';
+    }
   }
 
   function buildWorkPlanHtml(owner: string, todayText: string, delayed: JiraIssueRow[], thisWeekInProgress: JiraIssueRow[], needToday: JiraIssueRow[]): string {
@@ -165,11 +229,10 @@ namespace FerbToolsJiraReportContentFeature {
     workHtml += buildTicketGroupHtml(`Tickets assigned có due date trong tuần và đang làm: ${thisWeekInProgress.length} ticket`, thisWeekInProgress, buildTicketLineForPlan);
     workHtml += buildTicketGroupHtml(`Tickets cần hoàn thành hôm nay: ${needToday.length} ticket`, needToday, buildTicketLineForPlan);
     workHtml += '</ul>';
-
     return workHtml;
   }
 
-  function buildResultHtml(owner: string, todayText: string, todayDoneRows: JiraIssueRow[], openCount: number | null): string {
+  function buildResultHtml(owner: string, todayText: string, todayDoneRows: JiraIssueRow[], openCount: number): string {
     let resultHtml: string = `${escapeHtml(owner)} | Result of work on ${todayText}`;
     resultHtml += '<ul>';
     resultHtml += `<li>Số tasks hoàn thành: ${todayDoneRows.length} ticket${todayDoneRows.length > 1 ? 's' : ''}`;
@@ -183,19 +246,13 @@ namespace FerbToolsJiraReportContentFeature {
     }
 
     resultHtml += '</li>';
-
-    if (openCount !== null) {
-      resultHtml += `<li>Số tickets hiện có: ${openCount} ticket${openCount > 1 ? 's' : ''}</li>`;
-    }
-
+    resultHtml += `<li>Số tickets hiện có: ${openCount} ticket${openCount > 1 ? 's' : ''}</li>`;
     resultHtml += '</ul>';
-
     return resultHtml;
   }
 
   function buildTicketGroupHtml(title: string, rows: JiraIssueRow[], renderLine: (row: JiraIssueRow) => string): string {
     let html: string = `<li>${escapeHtml(title)}`;
-
     if (rows.length > 0) {
       html += '<ul>';
       rows.forEach((row: JiraIssueRow): void => {
@@ -203,33 +260,20 @@ namespace FerbToolsJiraReportContentFeature {
       });
       html += '</ul>';
     }
-
-    html += '</li>';
-    return html;
-  }
-
-  function buildTicketLink(row: JiraIssueRow): string {
-    if (row.keyUrl) {
-      return `<a href="${escapeAttribute(row.keyUrl)}" style="text-decoration:none; color:#0052cc;">${escapeHtml(row.key)}</a>`;
-    }
-
-    return escapeHtml(row.key);
+    return `${html}</li>`;
   }
 
   function buildTicketLineForPlan(row: JiraIssueRow): string {
     const parts: string[] = [];
-
     if (row.parent) {
       parts.push(row.parent);
     }
-
     if (row.summary) {
       parts.push(row.summary);
     }
 
     const taskText: string = parts.map(escapeHtml).join(' - ');
     const estimationHtml: string = row.estimation ? `${taskText ? ' - ' : ''}<strong>Est: ${escapeHtml(row.estimation)}</strong>` : '';
-
     return `${buildTicketLink(row)}: ${taskText}${estimationHtml}`;
   }
 
@@ -237,29 +281,62 @@ namespace FerbToolsJiraReportContentFeature {
     return `${buildTicketLink(row)}: ${escapeHtml(row.summary)}`;
   }
 
+  function buildTicketLink(row: JiraIssueRow): string {
+    return `<a href="${escapeAttribute(row.keyUrl)}" style="text-decoration:none; color:#0052cc;">${escapeHtml(row.key)}</a>`;
+  }
+
+  function formatEstimation(candidate: unknown): string {
+    if (typeof candidate !== 'number' || !Number.isFinite(candidate)) {
+      return '';
+    }
+
+    if (candidate <= 0) {
+      return '30 minutes';
+    }
+
+    const totalMinutes: number = Math.max(1, Math.round(candidate / 60));
+    const hours: number = Math.floor(totalMinutes / 60);
+    const minutes: number = totalMinutes % 60;
+    const parts: string[] = [];
+
+    if (hours > 0) {
+      parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
+    }
+    if (minutes > 0) {
+      parts.push(`${minutes} minute${minutes > 1 ? 's' : ''}`);
+    }
+
+    return parts.join(' ');
+  }
+
+  function parseJiraDate(candidate: unknown): Date | null {
+    const value: string = readOptionalString(candidate);
+    const match: RegExpMatchArray | null = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) {
+      return null;
+    }
+
+    const year: number = Number(match[1]);
+    const month: number = Number(match[2]);
+    const day: number = Number(match[3]);
+    const date: Date = new Date(year, month - 1, day);
+    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null;
+  }
+
   function normalizeText(value: string | null | undefined): string {
     return (value ?? '').replace(/\s+/g, ' ').trim();
   }
 
-  function normalizeEstimation(value: string | null | undefined): string {
-    const estimation: string = normalizeText(value);
-    return /^0 minutes$/i.test(estimation) ? '30 minutes' : estimation;
+  function readRequiredString(value: unknown, errorMessage: string): string {
+    const normalized: string = readOptionalString(value);
+    if (!normalized) {
+      throw new Error(errorMessage);
+    }
+    return normalized;
   }
 
-  function parseJiraDate(value: string | null | undefined): Date | null {
-    const trimmed: string = normalizeText(value);
-
-    if (!trimmed) {
-      return null;
-    }
-
-    const date: Date = new Date(trimmed);
-
-    if (Number.isNaN(date.getTime())) {
-      return null;
-    }
-
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  function readOptionalString(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
   }
 
   function startOfDay(date: Date): Date {
@@ -282,10 +359,6 @@ namespace FerbToolsJiraReportContentFeature {
     return `${day}/${month}/${date.getFullYear()}`;
   }
 
-  function isDoneStatus(statusText: string): boolean {
-    return /done/i.test(statusText);
-  }
-
   function escapeHtml(value: string): string {
     return value
       .replace(/&/g, '&amp;')
@@ -300,18 +373,18 @@ namespace FerbToolsJiraReportContentFeature {
   }
 
   function isGenerateMessage(message: unknown): message is JiraReportGenerateMessage {
-    if (typeof message !== 'object' || message === null) {
+    if (!isRecord(message) || message.type !== 'RUN_JIRA_REPORT_GENERATE_V5' || !isRecord(message.settings)) {
       return false;
     }
 
-    const candidate: Record<string, unknown> = message as Record<string, unknown>;
-    const settings: unknown = candidate.settings;
-
     return (
-      candidate.type === 'RUN_JIRA_REPORT_GENERATE_V3' &&
-      typeof settings === 'object' &&
-      settings !== null &&
-      typeof (settings as Record<string, unknown>).owner === 'string'
+      typeof message.settings.role === 'string' &&
+      typeof message.settings.myTasksJql === 'string' &&
+      typeof message.settings.todayDoneJql === 'string'
     );
+  }
+
+  function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
   }
 }

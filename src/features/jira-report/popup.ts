@@ -1,13 +1,20 @@
 namespace FerbToolsJiraReportPopupFeature {
   const JIRA_REPORT_STORAGE_KEY = 'ferbToolsJiraReportLastReport';
   const JIRA_REPORT_SETTINGS_STORAGE_KEY = 'ferbToolsJiraReportSettings';
+  const DEFAULT_MY_TASKS_JQL = 'assignee = currentUser() AND statusCategory != Done ORDER BY duedate ASC';
+  const DEFAULT_TODAY_DONE_JQL = 'assignee = currentUser() AND statusCategory = Done AND status CHANGED TO Done AFTER startOfDay() ORDER BY updated DESC';
   const DEFAULT_SETTINGS: JiraReportSettings = {
-    owner: 'Ferb DEV',
+    role: 'DEV',
+    myTasksJql: DEFAULT_MY_TASKS_JQL,
+    todayDoneJql: DEFAULT_TODAY_DONE_JQL,
   };
 
   export interface Elements {
     section: HTMLDetailsElement;
-    ownerInput: HTMLInputElement;
+    roleInput: HTMLInputElement;
+    siteUrlInput: HTMLInputElement;
+    myTasksJqlInput: HTMLTextAreaElement;
+    todayDoneJqlInput: HTMLTextAreaElement;
     generateButton: HTMLButtonElement;
     copyWorkButton: HTMLButtonElement;
     copyResultButton: HTMLButtonElement;
@@ -39,8 +46,10 @@ namespace FerbToolsJiraReportPopupFeature {
       void copyPreview(elements.copyResultButton, elements.resultPreview.innerHTML);
     });
 
-    elements.ownerInput.addEventListener('change', (): void => {
-      void saveSettings();
+    [elements.roleInput, elements.myTasksJqlInput, elements.todayDoneJqlInput].forEach((input: HTMLInputElement | HTMLTextAreaElement): void => {
+      input.addEventListener('change', (): void => {
+        void saveSettings();
+      });
     });
 
     void loadSettings();
@@ -55,14 +64,14 @@ namespace FerbToolsJiraReportPopupFeature {
         await writeSettings(settings);
         const tab: chrome.tabs.Tab | undefined = await getCurrentTab();
 
-        if (!tab || typeof tab.id !== 'number' || !isJiraDashboardUrl(tab.url)) {
-          throw new Error('Mở đúng Jira dashboard.');
+        if (!tab || typeof tab.id !== 'number' || !isConfiguredJiraTab(tab.url, elements.siteUrlInput.value)) {
+          throw new Error('Mở tab Jira đã đăng nhập đúng site URL rồi thử lại.');
         }
 
         const response: JiraReportResponse = await sendTabMessage<JiraReportGenerateMessage, JiraReportResponse>(
           tab.id,
           {
-            type: 'RUN_JIRA_REPORT_GENERATE_V3',
+            type: 'RUN_JIRA_REPORT_GENERATE_V5',
             settings,
           }
         );
@@ -108,7 +117,10 @@ namespace FerbToolsJiraReportPopupFeature {
       elements.generateButton.disabled = isBusy;
       elements.copyWorkButton.disabled = isBusy;
       elements.copyResultButton.disabled = isBusy;
-      elements.ownerInput.disabled = isBusy;
+      elements.roleInput.disabled = isBusy;
+      elements.siteUrlInput.disabled = isBusy;
+      elements.myTasksJqlInput.disabled = isBusy;
+      elements.todayDoneJqlInput.disabled = isBusy;
       elements.generateButton.textContent = isBusy ? '...' : 'Generate';
 
       if (status) {
@@ -134,12 +146,16 @@ namespace FerbToolsJiraReportPopupFeature {
 
     function readSettingsFromForm(): JiraReportSettings {
       return {
-        owner: normalizeOwner(elements.ownerInput.value, DEFAULT_SETTINGS.owner),
+        role: normalizeRole(elements.roleInput.value, DEFAULT_SETTINGS.role),
+        myTasksJql: normalizeJql(elements.myTasksJqlInput.value, DEFAULT_SETTINGS.myTasksJql),
+        todayDoneJql: normalizeJql(elements.todayDoneJqlInput.value, DEFAULT_SETTINGS.todayDoneJql),
       };
     }
 
     function renderSettings(settings: JiraReportSettings): void {
-      elements.ownerInput.value = settings.owner;
+      elements.roleInput.value = settings.role;
+      elements.myTasksJqlInput.value = settings.myTasksJql;
+      elements.todayDoneJqlInput.value = settings.todayDoneJql;
     }
 
     async function loadLastReport(): Promise<void> {
@@ -254,8 +270,17 @@ namespace FerbToolsJiraReportPopupFeature {
     return error instanceof Error && (error.message.includes('Receiving end does not exist') || error.message.includes('message port closed'));
   }
 
-  function isJiraDashboardUrl(url: string | undefined): boolean {
-    return Boolean(url?.startsWith('https://globee-software-ecommerce.atlassian.net/jira/dashboards/'));
+  function isConfiguredJiraTab(url: string | undefined, configuredSiteUrl: string): boolean {
+    if (!url) {
+      return false;
+    }
+
+    try {
+      const tabUrl = new URL(url);
+      return tabUrl.origin === new URL(configuredSiteUrl).origin;
+    } catch (_error: unknown) {
+      return false;
+    }
   }
 
   async function readLastReport(): Promise<JiraReportResult | null> {
@@ -326,12 +351,27 @@ namespace FerbToolsJiraReportPopupFeature {
     }
 
     return {
-      owner: normalizeOwner(candidate.owner ?? candidate.workPlanOwner ?? candidate.resultOwner, DEFAULT_SETTINGS.owner),
+      role: normalizeRole(candidate.role ?? extractLegacyRole(candidate.owner ?? candidate.workPlanOwner ?? candidate.resultOwner), DEFAULT_SETTINGS.role),
+      myTasksJql: normalizeJql(candidate.myTasksJql, DEFAULT_SETTINGS.myTasksJql),
+      todayDoneJql: normalizeJql(candidate.todayDoneJql, DEFAULT_SETTINGS.todayDoneJql),
     };
   }
 
-  function normalizeOwner(candidate: unknown, fallback: string): string {
+  function normalizeRole(candidate: unknown, fallback: string): string {
     return typeof candidate === 'string' && candidate.trim() ? candidate.trim() : fallback;
+  }
+
+  function normalizeJql(candidate: unknown, fallback: string): string {
+    return typeof candidate === 'string' && candidate.trim() ? candidate.trim() : fallback;
+  }
+
+  function extractLegacyRole(candidate: unknown): string {
+    if (typeof candidate !== 'string') {
+      return '';
+    }
+
+    const parts: string[] = candidate.trim().split(/\s+/);
+    return parts.length > 1 ? parts[parts.length - 1] ?? '' : '';
   }
 
   function normalizeReport(candidate: unknown): JiraReportResult | null {

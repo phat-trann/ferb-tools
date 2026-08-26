@@ -104,18 +104,52 @@ interface ContentAssetExportProgressMessage {
 }
 
 interface JiraReportGenerateMessage {
-  type: "RUN_JIRA_REPORT_GENERATE_V3";
+  type: "RUN_JIRA_REPORT_GENERATE_V5";
   settings: JiraReportSettings;
 }
 
 interface JiraReportSettings {
-  owner: string;
+  role: string;
+  myTasksJql: string;
+  todayDoneJql: string;
 }
 
 interface JiraReportResult {
   workHtml: string;
   resultHtml: string;
   warnings: string[];
+}
+
+interface JiraWorklogSettings {
+  siteUrl: string;
+  month: string;
+  concurrency: number;
+}
+
+interface JiraWorklogStartMessage {
+  type: "RUN_JIRA_WORKLOG_SYNC_V1";
+  settings: JiraWorklogSettings;
+}
+
+interface JiraWorklogTicketResult {
+  key: string;
+  summary: string;
+  seconds: number;
+}
+
+interface JiraWorklogDayResult {
+  date: string;
+  seconds: number;
+}
+
+interface JiraWorklogResult {
+  accountId: string;
+  displayName: string;
+  month: string;
+  totalSeconds: number;
+  tickets: JiraWorklogTicketResult[];
+  days: JiraWorklogDayResult[];
+  generatedAt: number;
 }
 
 interface ContentAssetSettings {
@@ -172,5 +206,11 @@ interface ContentAssetExportResponse {
 interface JiraReportResponse {
   success: boolean;
   report?: JiraReportResult;
+  error?: string;
+}
+
+interface JiraWorklogResponse {
+  success: boolean;
+  result?: JiraWorklogResult;
   error?: string;
 }

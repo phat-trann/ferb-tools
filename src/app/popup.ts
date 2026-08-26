@@ -14,6 +14,12 @@ namespace FerbToolsPopup {
     versionElement.textContent = `v${APP_VERSION}`;
     setStatus('');
 
+    initSettingsDrawer({
+      backdrop: getElementById('settings-backdrop', HTMLDivElement),
+      openButton: getElementById('settings-open-button', HTMLButtonElement),
+      closeButton: getElementById('settings-close-button', HTMLButtonElement),
+    });
+
     FerbToolsCheckInPopupFeature.init({
       setStatus,
       elements: {
@@ -44,11 +50,27 @@ namespace FerbToolsPopup {
       },
     });
 
+    FerbToolsJiraWorklogPopupFeature.init({
+      setStatus,
+      elements: {
+        section: getElementById('jira-worklog-section', HTMLDetailsElement),
+        siteUrlInput: getElementById('jira-worklog-site-url', HTMLInputElement),
+        monthInput: getElementById('jira-worklog-month', HTMLInputElement),
+        concurrencyInput: getElementById('jira-worklog-concurrency', HTMLInputElement),
+        startButton: getElementById('jira-worklog-start-button', HTMLButtonElement),
+        summaryElement: getElementById('jira-worklog-summary', HTMLParagraphElement),
+        preview: getElementById('jira-worklog-preview', HTMLDivElement),
+      },
+    });
+
     FerbToolsJiraReportPopupFeature.init({
       setStatus,
       elements: {
         section: getElementById('jira-report-section', HTMLDetailsElement),
-        ownerInput: getElementById('jira-report-owner', HTMLInputElement),
+        roleInput: getElementById('jira-report-role', HTMLInputElement),
+        siteUrlInput: getElementById('jira-worklog-site-url', HTMLInputElement),
+        myTasksJqlInput: getElementById('jira-report-my-tasks-jql', HTMLTextAreaElement),
+        todayDoneJqlInput: getElementById('jira-report-today-done-jql', HTMLTextAreaElement),
         generateButton: getElementById('jira-report-generate-button', HTMLButtonElement),
         copyWorkButton: getElementById('jira-report-copy-work-button', HTMLButtonElement),
         copyResultButton: getElementById('jira-report-copy-result-button', HTMLButtonElement),
@@ -57,6 +79,45 @@ namespace FerbToolsPopup {
       },
     });
   });
+
+  interface SettingsDrawerElements {
+    backdrop: HTMLDivElement;
+    openButton: HTMLButtonElement;
+    closeButton: HTMLButtonElement;
+  }
+
+  function initSettingsDrawer(elements: SettingsDrawerElements): void {
+    const setOpen = (isOpen: boolean): void => {
+      elements.backdrop.hidden = !isOpen;
+      elements.openButton.setAttribute('aria-expanded', String(isOpen));
+
+      if (isOpen) {
+        elements.closeButton.focus();
+      } else {
+        elements.openButton.focus();
+      }
+    };
+
+    elements.openButton.addEventListener('click', (): void => {
+      setOpen(true);
+    });
+
+    elements.closeButton.addEventListener('click', (): void => {
+      setOpen(false);
+    });
+
+    elements.backdrop.addEventListener('click', (event: MouseEvent): void => {
+      if (event.target === elements.backdrop) {
+        setOpen(false);
+      }
+    });
+
+    document.addEventListener('keydown', (event: KeyboardEvent): void => {
+      if (event.key === 'Escape' && !elements.backdrop.hidden) {
+        setOpen(false);
+      }
+    });
+  }
 
   function getElementById<TElement extends HTMLElement>(id: string, constructor: { new (): TElement }): TElement {
     const element: HTMLElement | null = document.getElementById(id);
