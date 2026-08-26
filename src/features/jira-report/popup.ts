@@ -1,8 +1,13 @@
 namespace FerbToolsJiraReportPopupFeature {
   const JIRA_REPORT_STORAGE_KEY = 'ferbToolsJiraReportLastReport';
+  const JIRA_REPORT_SETTINGS_STORAGE_KEY = 'ferbToolsJiraReportSettings';
+  const DEFAULT_SETTINGS: JiraReportSettings = {
+    owner: 'Ferb DEV',
+  };
 
   export interface Elements {
     section: HTMLDetailsElement;
+    ownerInput: HTMLInputElement;
     generateButton: HTMLButtonElement;
     copyWorkButton: HTMLButtonElement;
     copyResultButton: HTMLButtonElement;
@@ -34,6 +39,11 @@ namespace FerbToolsJiraReportPopupFeature {
       void copyPreview(elements.copyResultButton, elements.resultPreview.innerHTML);
     });
 
+    elements.ownerInput.addEventListener('change', (): void => {
+      void saveSettings();
+    });
+
+    void loadSettings();
     void loadLastReport();
 
     async function generateReport(): Promise<void> {
@@ -41,6 +51,8 @@ namespace FerbToolsJiraReportPopupFeature {
       setBusy(true, 'Đang generate...');
 
       try {
+        const settings: JiraReportSettings = readSettingsFromForm();
+        await writeSettings(settings);
         const tab: chrome.tabs.Tab | undefined = await getCurrentTab();
 
         if (!tab || typeof tab.id !== 'number' || !isJiraDashboardUrl(tab.url)) {
@@ -50,7 +62,8 @@ namespace FerbToolsJiraReportPopupFeature {
         const response: JiraReportResponse = await sendTabMessage<JiraReportGenerateMessage, JiraReportResponse>(
           tab.id,
           {
-            type: 'RUN_JIRA_REPORT_GENERATE_V2',
+            type: 'RUN_JIRA_REPORT_GENERATE_V3',
+            settings,
           }
         );
 
@@ -95,11 +108,38 @@ namespace FerbToolsJiraReportPopupFeature {
       elements.generateButton.disabled = isBusy;
       elements.copyWorkButton.disabled = isBusy;
       elements.copyResultButton.disabled = isBusy;
+      elements.ownerInput.disabled = isBusy;
       elements.generateButton.textContent = isBusy ? '...' : 'Generate';
 
       if (status) {
         setStatus(status);
       }
+    }
+
+    async function loadSettings(): Promise<void> {
+      try {
+        renderSettings(await readSettings());
+      } catch (error: unknown) {
+        console.error('Failed to load Jira report settings', error);
+      }
+    }
+
+    async function saveSettings(): Promise<void> {
+      try {
+        await writeSettings(readSettingsFromForm());
+      } catch (error: unknown) {
+        setStatus(error instanceof Error ? error.message : 'Lưu Jira report config lỗi.');
+      }
+    }
+
+    function readSettingsFromForm(): JiraReportSettings {
+      return {
+        owner: normalizeOwner(elements.ownerInput.value, DEFAULT_SETTINGS.owner),
+      };
+    }
+
+    function renderSettings(settings: JiraReportSettings): void {
+      elements.ownerInput.value = settings.owner;
     }
 
     async function loadLastReport(): Promise<void> {
@@ -247,6 +287,51 @@ namespace FerbToolsJiraReportPopupFeature {
         }
       );
     });
+  }
+
+  async function readSettings(): Promise<JiraReportSettings> {
+    return new Promise((resolve: (value: JiraReportSettings) => void): void => {
+      chrome.storage.local.get(JIRA_REPORT_SETTINGS_STORAGE_KEY, (items: Record<string, unknown>): void => {
+        if (chrome.runtime.lastError) {
+          resolve({ ...DEFAULT_SETTINGS });
+          return;
+        }
+
+        resolve(normalizeSettings(items[JIRA_REPORT_SETTINGS_STORAGE_KEY]));
+      });
+    });
+  }
+
+  async function writeSettings(settings: JiraReportSettings): Promise<void> {
+    return new Promise((resolve: () => void, reject: (reason?: unknown) => void): void => {
+      chrome.storage.local.set(
+        {
+          [JIRA_REPORT_SETTINGS_STORAGE_KEY]: settings,
+        },
+        (): void => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+
+          resolve();
+        }
+      );
+    });
+  }
+
+  function normalizeSettings(candidate: unknown): JiraReportSettings {
+    if (!isRecord(candidate)) {
+      return { ...DEFAULT_SETTINGS };
+    }
+
+    return {
+      owner: normalizeOwner(candidate.owner ?? candidate.workPlanOwner ?? candidate.resultOwner, DEFAULT_SETTINGS.owner),
+    };
+  }
+
+  function normalizeOwner(candidate: unknown, fallback: string): string {
+    return typeof candidate === 'string' && candidate.trim() ? candidate.trim() : fallback;
   }
 
   function normalizeReport(candidate: unknown): JiraReportResult | null {

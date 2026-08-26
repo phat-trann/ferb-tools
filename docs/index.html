@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description"
-    content="FerbTools is a Chrome MV3 extension toolkit. Current tool: check-in and checkout reminders. Made by Ferb.">
+    content="FerbTools v1.12.0 is a Chrome MV3 toolkit for check-in reminders, SFCC content asset exports, and Jira Work Plan and Result reports. Made by Ferb.">
   <link rel="icon" type="image/png" sizes="128x128" href="./assets/icon-128.png">
   <link rel="apple-touch-icon" href="./assets/icon-128.png">
   <title>FerbTools - Chrome Extension Toolkit</title>
@@ -55,6 +55,17 @@
       font-weight: 900;
       letter-spacing: -0.04em;
       text-decoration: none;
+    }
+
+    .brand-version {
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: rgba(15, 23, 42, 0.62);
+      background: rgba(255, 255, 255, 0.62);
+      font-size: 0.72rem;
+      font-weight: 900;
+      letter-spacing: 0;
     }
 
     .brand-mark {
@@ -266,6 +277,12 @@
       color: rgba(15, 23, 42, 0.68);
     }
 
+    .card .detail {
+      margin-top: 10px;
+      color: rgba(15, 23, 42, 0.54);
+      font-size: 0.88rem;
+    }
+
     .steps {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -343,6 +360,7 @@
           <img src="./assets/icon-128.png" width="44" height="44" alt="" aria-hidden="true">
         </span>
         <span>FerbTools</span>
+        <span class="brand-version">v1.12.0</span>
       </a>
       <div class="nav-links">
         <a href="https://github.com/phat-trann/ferb-tools" rel="noreferrer" target="_blank"
@@ -364,11 +382,11 @@
 
     <section id="top" class="hero">
       <div>
-        <p class="eyebrow">Chrome MV3 toolkit</p>
-        <h1>Check in, work enough, check out.</h1>
+        <p class="eyebrow">Chrome MV3 toolkit · Version 1.12.0</p>
+        <h1>Check in. Export content. Report work.</h1>
         <p class="lead">
-          FerbTools is a Chrome extension toolkit. Its first tool reminds you to check in once per day, tracks your
-          configured work duration, and shows the checkout reminder when your rounded work window is complete.
+          FerbTools brings daily check-in reminders, SFCC Content Asset XML exports, batch content exports, and Jira
+          Work Plan and Result reports into one compact Chrome extension popup.
         </p>
         <div class="actions">
           <a class="button primary" href="https://github.com/phat-trann/ferb-tools/releases" rel="noreferrer"
@@ -386,53 +404,79 @@
         </div>
       </div>
 
-      <aside class="product-card" aria-label="FerbTools status preview">
+      <aside class="product-card" aria-label="FerbTools tool preview">
         <div class="badge-row">
-          <span class="status-badge off">OFF</span>
-          <span class="status-badge pending">IN?</span>
-          <span class="status-badge countdown">8h</span>
-          <span class="status-badge ready">OUT</span>
+          <span class="status-badge off">IN</span>
+          <span class="status-badge pending">XML</span>
+          <span class="status-badge countdown">LIST</span>
+          <span class="status-badge ready">JIRA</span>
         </div>
         <div class="setup-panel">
           <div class="setup-field">
-            <span>Latest check-in</span>
-            <span class="setup-value">10:00</span>
+            <span>Check-in Reminder</span>
+            <span class="setup-value">Daily</span>
           </div>
           <div class="setup-field">
-            <span>Work duration</span>
-            <span class="setup-value">9h</span>
+            <span>Content Asset Export</span>
+            <span class="setup-value">XML</span>
           </div>
           <div class="setup-field">
-            <span>Rounding slot</span>
-            <span class="setup-value">30m</span>
+            <span>Content Asset List Export</span>
+            <span class="setup-value">Batch</span>
           </div>
           <div class="setup-field">
-            <span>Today check-in</span>
-            <span class="setup-value">09:30</span>
+            <span>Jira Report</span>
+            <span class="setup-value">Plan + Result</span>
           </div>
         </div>
       </aside>
     </section>
 
     <section id="features" class="section">
-      <p class="eyebrow">Why it exists</p>
-      <h2>A toolkit starting with one daily workflow.</h2>
+      <p class="eyebrow">Current tools · v1.12.0</p>
+      <h2>Four workflows, one focused popup.</h2>
       <div class="grid">
         <article class="card">
-          <h3>Daily reminder</h3>
-          <p>The first eligible active tab of each local day triggers a check-in reminder modal with an editable
-            check-in time and one-hour tab snooze.</p>
+          <h3>Check-in Reminder</h3>
+          <p>Records today's check-in, calculates the checkout time from your work duration, rounds it to the selected
+            slot, and keeps the action badge in sync.</p>
+          <p class="detail">Includes editable daily data, clear-day action, weekday-aware prompts, late check-in
+            handling, snooze, and checkout reminders.</p>
         </article>
         <article class="card">
-          <h3>Configurable schedule</h3>
-          <p>Adjust the latest on-time check-in threshold, work duration, and checkout rounding slot from the setup
-            popup.</p>
+          <h3>Content Asset Export</h3>
+          <p>Builds an SFCC library XML file from the Content Asset detail page, including localized, site-specific,
+            custom, page, sitemap, and folder-link data.</p>
+          <p class="detail">Saved locale and site-ID mapping settings let the generated XML match each Business
+            Manager environment.</p>
         </article>
         <article class="card">
-          <h3>Manual correction</h3>
-          <p>If the browser opens late, correct or clear today's recorded check-in data and FerbTools recomputes the
-            due time
-            and badge state.</p>
+          <h3>Content Asset List Export</h3>
+          <p>Searches and exports multiple Content Asset IDs into one XML file from the SFCC content list page, with a
+            configurable filename and parallel worker count.</p>
+          <p class="detail">Accepts IDs separated by whitespace, commas, or semicolons and derives the shared library
+            wrapper from the first content with active-list fallback.</p>
+        </article>
+        <article class="card">
+          <h3>Jira Work Plan</h3>
+          <p>Reads the Jira “My tasks” dashboard table and groups open tickets into delayed, due this week, and due
+            today sections.</p>
+          <p class="detail">Each task includes its estimate in bold; a Jira value of 0 minutes is normalized to 30
+            minutes.</p>
+        </article>
+        <article class="card">
+          <h3>Jira Result</h3>
+          <p>Reads “Today Done”, lists completed tasks, and reports the current open-ticket count in copy-ready HTML
+            and plain text.</p>
+          <p class="detail">Work Plan and Result previews remain editable and the most recently generated report is
+            restored when the popup reopens.</p>
+        </article>
+        <article class="card">
+          <h3>Saved configuration</h3>
+          <p>Tool settings live in Chrome local storage, including check-in preferences, Content Asset setup, batch
+            inputs, and the Jira report Owner shared by Work Plan and Result.</p>
+          <p class="detail">The popup reads its displayed version directly from the extension manifest to stay aligned
+            with each build.</p>
         </article>
       </div>
     </section>
@@ -467,7 +511,7 @@
     </section>
 
     <footer class="footer">
-      FerbTools. Made by Ferb.
+      FerbTools v1.12.0. Made by Ferb.
     </footer>
   </main>
 </body>

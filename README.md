@@ -10,7 +10,7 @@ Current tools:
 
 ## Version
 
-Current version: `1.11.1`
+Current version: `1.12.0`
 
 Versioning uses semantic versioning:
 
@@ -19,6 +19,11 @@ Versioning uses semantic versioning:
 - Major: breaking storage, package, or workflow change.
 
 ## Version Notes
+
+### 1.12.0
+
+- Adds a saved Owner setting shared by Jira Work Plan and Result generation.
+- Synchronizes the landing page with the complete tool set and displays the current version.
 
 ### 1.11.1
 

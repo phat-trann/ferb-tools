@@ -1,5 +1,5 @@
 namespace FerbToolsJiraReportContentFeature {
-  const WINDOW_FLAG = '__ferbToolsJiraReportBootstrappedV2__';
+  const WINDOW_FLAG = '__ferbToolsJiraReportBootstrappedV3__';
 
   interface JiraIssueRow {
     key: string;
@@ -13,15 +13,11 @@ namespace FerbToolsJiraReportContentFeature {
   }
 
   interface JiraReportConfig {
-    workPlanOwner: string;
-    resultOwner: string;
     myTasksTitle: string;
     todayDoneTitle: string;
   }
 
   const CONFIG: JiraReportConfig = {
-    workPlanOwner: 'Ferb DEV',
-    resultOwner: 'Ferb DEV',
     myTasksTitle: 'My tasks',
     todayDoneTitle: 'Today Done',
   };
@@ -37,7 +33,7 @@ namespace FerbToolsJiraReportContentFeature {
       try {
         sendResponse({
           success: true,
-          report: generateReportsHTML(),
+          report: generateReportsHTML(message.settings),
         });
       } catch (error: unknown) {
         sendResponse({
@@ -50,7 +46,7 @@ namespace FerbToolsJiraReportContentFeature {
     });
   }
 
-  function generateReportsHTML(): JiraReportResult {
+  function generateReportsHTML(settings: JiraReportSettings): JiraReportResult {
     const map: Record<string, HTMLTableElement> = buildIssueTableMapByTitle();
     const myTasksTable: HTMLTableElement | null = map[normalizeText(CONFIG.myTasksTitle).toLowerCase()] ?? null;
     const todayDoneTable: HTMLTableElement | null = map[normalizeText(CONFIG.todayDoneTitle).toLowerCase()] ?? null;
@@ -106,8 +102,8 @@ namespace FerbToolsJiraReportContentFeature {
     }
 
     return {
-      workHtml: buildWorkPlanHtml(todayText, delayed, thisWeekInProgress, needToday),
-      resultHtml: buildResultHtml(todayText, todayDoneRows, myTasksTable ? openCount : null),
+      workHtml: buildWorkPlanHtml(settings.owner, todayText, delayed, thisWeekInProgress, needToday),
+      resultHtml: buildResultHtml(settings.owner, todayText, todayDoneRows, myTasksTable ? openCount : null),
       warnings,
     };
   }
@@ -162,8 +158,8 @@ namespace FerbToolsJiraReportContentFeature {
     });
   }
 
-  function buildWorkPlanHtml(todayText: string, delayed: JiraIssueRow[], thisWeekInProgress: JiraIssueRow[], needToday: JiraIssueRow[]): string {
-    let workHtml: string = `${escapeHtml(CONFIG.workPlanOwner)} | Work Plan on ${todayText}`;
+  function buildWorkPlanHtml(owner: string, todayText: string, delayed: JiraIssueRow[], thisWeekInProgress: JiraIssueRow[], needToday: JiraIssueRow[]): string {
+    let workHtml: string = `${escapeHtml(owner)} | Work Plan on ${todayText}`;
     workHtml += '<ul>';
     workHtml += buildTicketGroupHtml(`Delayed: ${delayed.length} ticket${delayed.length > 1 ? 's' : ''}`, delayed, buildTicketLineForPlan);
     workHtml += buildTicketGroupHtml(`Tickets assigned có due date trong tuần và đang làm: ${thisWeekInProgress.length} ticket`, thisWeekInProgress, buildTicketLineForPlan);
@@ -173,8 +169,8 @@ namespace FerbToolsJiraReportContentFeature {
     return workHtml;
   }
 
-  function buildResultHtml(todayText: string, todayDoneRows: JiraIssueRow[], openCount: number | null): string {
-    let resultHtml: string = `${escapeHtml(CONFIG.resultOwner)} | Result of work on ${todayText}`;
+  function buildResultHtml(owner: string, todayText: string, todayDoneRows: JiraIssueRow[], openCount: number | null): string {
+    let resultHtml: string = `${escapeHtml(owner)} | Result of work on ${todayText}`;
     resultHtml += '<ul>';
     resultHtml += `<li>Số tasks hoàn thành: ${todayDoneRows.length} ticket${todayDoneRows.length > 1 ? 's' : ''}`;
 
@@ -304,6 +300,18 @@ namespace FerbToolsJiraReportContentFeature {
   }
 
   function isGenerateMessage(message: unknown): message is JiraReportGenerateMessage {
-    return typeof message === 'object' && message !== null && (message as Record<string, unknown>).type === 'RUN_JIRA_REPORT_GENERATE_V2';
+    if (typeof message !== 'object' || message === null) {
+      return false;
+    }
+
+    const candidate: Record<string, unknown> = message as Record<string, unknown>;
+    const settings: unknown = candidate.settings;
+
+    return (
+      candidate.type === 'RUN_JIRA_REPORT_GENERATE_V3' &&
+      typeof settings === 'object' &&
+      settings !== null &&
+      typeof (settings as Record<string, unknown>).owner === 'string'
+    );
   }
 }

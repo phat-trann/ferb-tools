@@ -48,6 +48,7 @@ namespace FerbToolsPopup {
       setStatus,
       elements: {
         section: getElementById('jira-report-section', HTMLDetailsElement),
+        ownerInput: getElementById('jira-report-owner', HTMLInputElement),
         generateButton: getElementById('jira-report-generate-button', HTMLButtonElement),
         copyWorkButton: getElementById('jira-report-copy-work-button', HTMLButtonElement),
         copyResultButton: getElementById('jira-report-copy-result-button', HTMLButtonElement),
