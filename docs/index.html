@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description"
-    content="FerbTools v1.15.0 is a Chrome MV3 toolkit for check-in reminders, SFCC content asset exports, personal Jira worklogs, and API-powered Work Plan and Result reports. Made by Ferb.">
+    content="FerbTools v1.18.2 is a configurable Chrome MV3 toolkit for check-in reminders, SFCC content asset exports, monthly KPI tracking, and API-powered Work Plan and Result reports. Made by Ferb.">
   <link rel="icon" type="image/png" sizes="128x128" href="./assets/icon-128.png">
   <link rel="apple-touch-icon" href="./assets/icon-128.png">
   <title>FerbTools - Chrome Extension Toolkit</title>
@@ -360,7 +360,7 @@
           <img src="./assets/icon-128.png" width="44" height="44" alt="" aria-hidden="true">
         </span>
         <span>FerbTools</span>
-        <span class="brand-version">v1.15.0</span>
+        <span class="brand-version">v1.18.2</span>
       </a>
       <div class="nav-links">
         <a href="https://github.com/phat-trann/ferb-tools" rel="noreferrer" target="_blank"
@@ -382,11 +382,11 @@
 
     <section id="top" class="hero">
       <div>
-        <p class="eyebrow">Chrome MV3 toolkit · Version 1.15.0</p>
+        <p class="eyebrow">Chrome MV3 toolkit · Version 1.18.2</p>
         <h1>Check in. Export content. Report work.</h1>
         <p class="lead">
           FerbTools brings daily check-in reminders, SFCC Content Asset XML exports, batch content exports, personal
-          Jira worklog totals, and Work Plan and Result reports into one compact Chrome extension popup.
+          monthly Jira KPI tracking, and Work Plan and Result reports into one compact Chrome extension popup.
         </p>
         <div class="actions">
           <a class="button primary" href="https://github.com/phat-trann/ferb-tools/releases" rel="noreferrer"
@@ -426,8 +426,8 @@
             <span class="setup-value">Batch</span>
           </div>
           <div class="setup-field">
-            <span>Jira Worklog</span>
-            <span class="setup-value">My hours</span>
+            <span>Monthly KPI</span>
+            <span class="setup-value">PASS / FAIL</span>
           </div>
           <div class="setup-field">
             <span>Jira Report</span>
@@ -438,7 +438,7 @@
     </section>
 
     <section id="features" class="section">
-      <p class="eyebrow">Current tools · v1.15.0</p>
+      <p class="eyebrow">Current tools · v1.18.2</p>
       <h2>Five workflows, one focused popup.</h2>
       <div class="grid">
         <article class="card">
@@ -463,11 +463,11 @@
             wrapper from the first content with active-list fallback.</p>
         </article>
         <article class="card">
-          <h3>Jira Worklog</h3>
-          <p>Uses the active signed-in Jira session to identify the current user and load that user's worklogs for a
-            configured month.</p>
-          <p class="detail">Totals time by ticket and calendar day in hours and minutes, supports configurable parallel
-            requests, restores the last result, and never stores an API token.</p>
+          <h3>Monthly KPI</h3>
+          <p>Combines the signed-in user's Jira REST API data with actual 1Office attendance through yesterday for the
+            selected month.</p>
+          <p class="detail">Tracks Working time, On Deadline, Bug fix time capped at 10%, manual Production Issue,
+            and NC process compliance with target markers and per-metric plus overall PASS/FAIL status.</p>
         </article>
         <article class="card">
           <h3>Jira Work Plan</h3>
@@ -481,13 +481,13 @@
           <p>Loads the configured “Today Done” JQL, lists completed tasks, and reports the current open-ticket count
             in copy-ready HTML and plain text.</p>
           <p class="detail">Work Plan and Result previews remain editable and the most recently generated report is
-            restored when the popup reopens.</p>
+            restored when the popup reopens. Jira is reused or opened automatically when Generate runs.</p>
         </article>
         <article class="card">
           <h3>Saved configuration</h3>
           <p>Long-lived tool settings are grouped in one drawer behind the header gear icon, including check-in
-            preferences, Content Asset setup, Jira site/concurrency, Jira Report role, and both report JQL queries.</p>
-          <p class="detail">The popup reads its displayed version directly from the extension manifest to stay aligned
+            preferences, Content Asset setup, Jira and 1Office URLs, Role, and report JQL queries.</p>
+          <p class="detail">Visibility toggles can hide unused functions and their settings. The popup reads its displayed version directly from the extension manifest to stay aligned
             with each build.</p>
         </article>
       </div>
@@ -523,7 +523,7 @@
     </section>
 
     <footer class="footer">
-      FerbTools v1.15.0. Made by Ferb.
+      FerbTools v1.18.2. Made by Ferb.
     </footer>
   </main>
 </body>

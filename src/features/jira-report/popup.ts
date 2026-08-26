@@ -57,15 +57,17 @@ namespace FerbToolsJiraReportPopupFeature {
 
     async function generateReport(): Promise<void> {
       elements.section.open = true;
-      setBusy(true, 'Đang generate...');
+      setBusy(true, 'Đang mở Jira và generate...');
 
       try {
         const settings: JiraReportSettings = readSettingsFromForm();
         await writeSettings(settings);
-        const tab: chrome.tabs.Tab | undefined = await getCurrentTab();
-
-        if (!tab || typeof tab.id !== 'number' || !isConfiguredJiraTab(tab.url, elements.siteUrlInput.value)) {
-          throw new Error('Mở tab Jira đã đăng nhập đúng site URL rồi thử lại.');
+        const tab: chrome.tabs.Tab = await FerbToolsBackgroundTabs.getOrCreate(elements.siteUrlInput.value, {
+          serviceName: 'Jira',
+          reuse: 'origin',
+        });
+        if (typeof tab.id !== 'number') {
+          throw new Error('Không tìm thấy Jira tab hợp lệ.');
         }
 
         const response: JiraReportResponse = await sendTabMessage<JiraReportGenerateMessage, JiraReportResponse>(
@@ -197,25 +199,6 @@ namespace FerbToolsJiraReportPopupFeature {
     ]);
   }
 
-  async function getCurrentTab(): Promise<chrome.tabs.Tab | undefined> {
-    return new Promise((resolve: (value: chrome.tabs.Tab | undefined) => void): void => {
-      chrome.tabs.query(
-        {
-          active: true,
-          currentWindow: true,
-        },
-        (tabs: chrome.tabs.Tab[]): void => {
-          if (chrome.runtime.lastError) {
-            resolve(undefined);
-            return;
-          }
-
-          resolve(tabs[0]);
-        }
-      );
-    });
-  }
-
   async function sendTabMessage<TRequest, TResponse>(tabId: number, message: TRequest): Promise<TResponse> {
     try {
       return await sendMessageToTab<TRequest, TResponse>(tabId, message);
@@ -268,19 +251,6 @@ namespace FerbToolsJiraReportPopupFeature {
 
   function isMissingReceiverError(error: unknown): boolean {
     return error instanceof Error && (error.message.includes('Receiving end does not exist') || error.message.includes('message port closed'));
-  }
-
-  function isConfiguredJiraTab(url: string | undefined, configuredSiteUrl: string): boolean {
-    if (!url) {
-      return false;
-    }
-
-    try {
-      const tabUrl = new URL(url);
-      return tabUrl.origin === new URL(configuredSiteUrl).origin;
-    } catch (_error: unknown) {
-      return false;
-    }
   }
 
   async function readLastReport(): Promise<JiraReportResult | null> {

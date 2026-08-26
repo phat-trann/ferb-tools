@@ -7,12 +7,12 @@ Current tools:
 - Check-in Reminder: stores today's check-in time, computes the checkout reminder, rounds the checkout time by the configured slot, and shows action badge status.
 - Content Asset Export: sends a message to `src/features/content-asset/content-asset-export.ts` on the current Business Manager tab.
 - Content Asset List Export: exports multiple SFCC content assets into one library XML file.
-- Jira Worklog: loads the signed-in Jira user's monthly worklogs and totals them by ticket and day.
+- Monthly KPI: combines the signed-in user's Jira REST API data with actual 1Office attendance through yesterday.
 - Jira Report: generates Work Plan and Result HTML entirely from Jira REST API v3 using configurable JQL.
 
 ## Version
 
-Current version: `1.15.0`
+Current version: `1.18.2`
 
 Versioning uses semantic versioning:
 
@@ -21,6 +21,37 @@ Versioning uses semantic versioning:
 - Major: breaking storage, package, or workflow change.
 
 ## Version Notes
+
+### 1.18.2
+
+- Fixes the 1Office reused-tab race by waiting for the requested month/year URL and the matching attendance table before reading data.
+- Expands popup status messages to multiple lines so full errors remain visible.
+- Moves Monthly KPI back above Jira Report.
+
+### 1.18.1
+
+- Moves Monthly KPI to the bottom of the popup tool list, after Jira Report.
+
+### 1.18.0
+
+- Adds saved visibility toggles for Check-in Reminder, Content Asset Export, Content Asset List Export, Monthly KPI, and Jira Report.
+- Hides disabled tool cards and their function-specific settings while keeping the visibility controls available in the Settings drawer.
+- Disables the background Check-in Reminder when that function is hidden; showing it again leaves its internal Enabled switch off until explicitly enabled.
+
+### 1.17.0
+
+- Replaces the Jira Worklog summary with a monthly KPI dashboard for Working time, On Deadline, Bug fix time, Production Issue, and NC process compliance.
+- Calculates expected Working time from actual 1Office attendance through yesterday, treating `1` as one day, `0.5` as half a day, and `0` as off.
+- Automatically opens or reuses the configured 1Office attendance page in a background tab and loads the selected month.
+- Adds progress bars, target markers, per-metric PASS/FAIL states, and an overall FAIL whenever any required metric fails.
+- Adds a monthly manual Production Issue checkbox where checked means FAIL, a configurable 1Office URL, and a fixed Bug fix target of at most 10% of total Working time.
+- Uses the configured Role to match `[BUG-ROLE]` Jira summaries and counts completed assigned tasks with due dates for On Deadline.
+
+### 1.16.0
+
+- Reuses any open configured Jira tab or automatically opens one in the background for Jira Worklog and Jira Report.
+- Waits for automatically opened Jira tabs to load before injecting the API worker, with clear timeout and login guidance.
+- Validates the active SFCC page before export and gives separate Content Asset Detail and Search Content Asset instructions for single and batch exports.
 
 ### 1.15.0
 

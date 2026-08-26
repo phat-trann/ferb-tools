@@ -116,14 +116,14 @@ namespace FerbToolsContentAssetPopupFeature {
         const tab: chrome.tabs.Tab | undefined = await getCurrentTab();
 
         if (!tab || typeof tab.id !== 'number' || !isInjectableUrl(tab.url)) {
-          throw new Error('Mở đúng Content Asset detail page.');
+          throw new Error('Hãy vào trang Content Asset Detail để export 1 content.');
         }
 
         const message: ContentAssetExportMessage = {
           type: 'RUN_CONTENT_ASSET_EXPORT',
           runId,
         };
-        const response: ContentAssetExportResponse = await sendTabMessage<ContentAssetExportMessage, ContentAssetExportResponse>(tab.id, message, 'Refresh Content Asset detail page.');
+        const response: ContentAssetExportResponse = await sendTabMessage<ContentAssetExportMessage, ContentAssetExportResponse>(tab.id, message, 'Hãy vào trang Content Asset Detail để export 1 content.');
 
         if (!response.success) {
           throw new Error(response.error ?? 'Export lỗi.');
@@ -160,7 +160,7 @@ namespace FerbToolsContentAssetPopupFeature {
         const tab: chrome.tabs.Tab | undefined = await getCurrentTab();
 
         if (!tab || typeof tab.id !== 'number' || !isInjectableUrl(tab.url)) {
-          throw new Error('Mở Content Asset list page.');
+          throw new Error('Hãy vào trang Search Content Asset để export nhiều contents.');
         }
 
         await writeSettings({
@@ -177,7 +177,7 @@ namespace FerbToolsContentAssetPopupFeature {
           concurrency,
           filename,
         };
-        const response: ContentAssetExportResponse = await sendTabMessage<ContentAssetListExportMessage, ContentAssetExportResponse>(tab.id, message, 'Refresh Content Asset list page.');
+        const response: ContentAssetExportResponse = await sendTabMessage<ContentAssetListExportMessage, ContentAssetExportResponse>(tab.id, message, 'Hãy vào trang Search Content Asset để export nhiều contents.');
 
         if (!response.success) {
           throw new Error(response.error ?? 'Export list lỗi.');

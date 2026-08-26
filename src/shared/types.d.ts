@@ -122,13 +122,16 @@ interface JiraReportResult {
 
 interface JiraWorklogSettings {
   siteUrl: string;
+  attendanceUrl: string;
   month: string;
   concurrency: number;
+  role: string;
 }
 
 interface JiraWorklogStartMessage {
-  type: "RUN_JIRA_WORKLOG_SYNC_V1";
+  type: "RUN_JIRA_WORKLOG_SYNC_V2";
   settings: JiraWorklogSettings;
+  cutoffDate: string;
 }
 
 interface JiraWorklogTicketResult {
@@ -147,9 +150,39 @@ interface JiraWorklogResult {
   displayName: string;
   month: string;
   totalSeconds: number;
+  cutoffDate: string;
+  bugFixSeconds: number;
+  completedWithDueDate: number;
+  completedOnTime: number;
+  ncCount: number;
   tickets: JiraWorklogTicketResult[];
   days: JiraWorklogDayResult[];
   generatedAt: number;
+}
+
+interface AttendanceDayResult {
+  date: string;
+  value: number;
+}
+
+interface AttendanceResult {
+  month: string;
+  cutoffDate: string;
+  attendanceDays: number;
+  days: AttendanceDayResult[];
+}
+
+interface AttendanceStartMessage {
+  type: "RUN_ATTENDANCE_SYNC_V1";
+  attendanceUrl: string;
+  month: string;
+  cutoffDate: string;
+}
+
+interface AttendanceResponse {
+  success: boolean;
+  result?: AttendanceResult;
+  error?: string;
 }
 
 interface ContentAssetSettings {

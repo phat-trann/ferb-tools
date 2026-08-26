@@ -317,6 +317,11 @@ namespace FerbToolsContentAssetExport {
   async function buildContentAsset(runId: string): Promise<ContentAssetResult> {
     console.log('Building content asset...');
     reportProgress(runId, 6, 'Reading page setup');
+
+    if (!isContentAssetDetailPage(document)) {
+      throw new Error('Hãy vào trang Content Asset Detail để export 1 content.');
+    }
+
     activeSettings = await readContentAssetSettings();
     const fragment: ContentAssetFragment = await buildContentAssetFragment(createBuildContext(document, window.location.href), runId);
 
@@ -485,10 +490,18 @@ namespace FerbToolsContentAssetExport {
     const form: HTMLFormElement | null = getContentListForm(doc);
 
     if (!form) {
-      throw new Error('Mở đúng Content Asset list page.');
+      throw new Error('Hãy vào trang Search Content Asset để export nhiều contents.');
     }
 
     return form;
+  }
+
+  function isContentAssetDetailPage(doc: Document): boolean {
+    return Boolean(
+      doc.querySelector<HTMLSelectElement>('select[name="LocaleId"]') &&
+      doc.querySelector<HTMLInputElement>('input[name="ContentUUID"]') &&
+      doc.querySelector<HTMLFormElement>('form[name="localeForm"]')
+    );
   }
 
   function getContentListForm(doc: Document): HTMLFormElement | null {

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "FerbTools",
   "description": "FerbTools is a Chrome extension toolkit for check-in reminders, SFCC exports, and Jira reports. Made by Ferb.",
-  "version": "1.15.0",
+  "version": "1.18.2",
   "permissions": ["storage", "tabs", "alarms", "scripting"],
   "host_permissions": ["<all_urls>"],
   "icons": {

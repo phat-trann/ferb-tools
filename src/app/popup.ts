@@ -55,8 +55,11 @@ namespace FerbToolsPopup {
       elements: {
         section: getElementById('jira-worklog-section', HTMLDetailsElement),
         siteUrlInput: getElementById('jira-worklog-site-url', HTMLInputElement),
+        attendanceUrlInput: getElementById('jira-worklog-attendance-url', HTMLInputElement),
         monthInput: getElementById('jira-worklog-month', HTMLInputElement),
         concurrencyInput: getElementById('jira-worklog-concurrency', HTMLInputElement),
+        roleInput: getElementById('jira-report-role', HTMLInputElement),
+        productionIssueInput: getElementById('jira-kpi-production-issue', HTMLInputElement),
         startButton: getElementById('jira-worklog-start-button', HTMLButtonElement),
         summaryElement: getElementById('jira-worklog-summary', HTMLParagraphElement),
         preview: getElementById('jira-worklog-preview', HTMLDivElement),
@@ -76,6 +79,30 @@ namespace FerbToolsPopup {
         copyResultButton: getElementById('jira-report-copy-result-button', HTMLButtonElement),
         workPreview: getElementById('jira-report-work-preview', HTMLDivElement),
         resultPreview: getElementById('jira-report-result-preview', HTMLDivElement),
+      },
+    });
+
+    FerbToolsVisibilityPopupFeature.init({
+      setStatus,
+      elements: {
+        checkInInput: getElementById('visible-check-in', HTMLInputElement),
+        contentAssetInput: getElementById('visible-content-asset', HTMLInputElement),
+        contentAssetListInput: getElementById('visible-content-asset-list', HTMLInputElement),
+        monthlyKpiInput: getElementById('visible-monthly-kpi', HTMLInputElement),
+        jiraReportInput: getElementById('visible-jira-report', HTMLInputElement),
+        checkInSettings: getElementById('check-in-settings-group', HTMLElement),
+        contentAssetSettings: getElementById('content-asset-settings-group', HTMLElement),
+        jiraSettings: getElementById('jira-settings-group', HTMLElement),
+        monthlyKpiAttendanceSetting: getElementById('monthly-kpi-attendance-setting', HTMLElement),
+        monthlyKpiParallelSetting: getElementById('monthly-kpi-parallel-setting', HTMLElement),
+        jiraReportMyTasksSetting: getElementById('jira-report-my-tasks-setting', HTMLElement),
+        jiraReportTodayDoneSetting: getElementById('jira-report-today-done-setting', HTMLElement),
+        contentAssetCard: getElementById('content-asset-section', HTMLElement),
+        contentAssetListCard: getElementById('content-asset-list-section', HTMLElement),
+        monthlyKpiCard: getElementById('jira-worklog-section', HTMLElement),
+        jiraReportCard: getElementById('jira-report-section', HTMLElement),
+        emptyState: getElementById('tool-visibility-empty', HTMLParagraphElement),
+        checkInEnabledInput: getElementById('enabled', HTMLInputElement),
       },
     });
   });
