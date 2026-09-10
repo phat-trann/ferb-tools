@@ -746,11 +746,10 @@ namespace FerbToolsContentAssetExport {
       return acc;
     }, createEmptyGroups());
 
-    grouped.generic = sortNameDescriptionFirst(grouped.generic);
-
-    GROUP_KEYS.forEach((key: ContentAssetGroupKey): void => {
-      grouped[key] = grouped[key].sort((a: ContentAssetItem, b: ContentAssetItem): number => a.id.localeCompare(b.id));
-    });
+    grouped.generic = sortByFieldOrder(grouped.generic, GENERIC_FIELDS);
+    grouped.page = sortByFieldOrder(grouped.page, PAGE_FIELDS);
+    grouped.custom = grouped.custom.sort(compareContentAssetItems);
+    grouped.sitemap = sortByFieldOrder(grouped.sitemap, SITEMAP_FIELDS);
 
     return grouped;
   }
@@ -788,12 +787,17 @@ namespace FerbToolsContentAssetExport {
     };
   }
 
-  function sortNameDescriptionFirst(items: ContentAssetItem[]): ContentAssetItem[] {
-    const names: ContentAssetItem[] = items.filter((item: ContentAssetItem): boolean => item.id === 'name');
-    const descriptions: ContentAssetItem[] = items.filter((item: ContentAssetItem): boolean => item.id === 'description');
-    const rest: ContentAssetItem[] = items.filter((item: ContentAssetItem): boolean => item.id !== 'name' && item.id !== 'description');
+  function sortByFieldOrder(items: ContentAssetItem[], fieldOrder: string[]): ContentAssetItem[] {
+    return items.sort((left: ContentAssetItem, right: ContentAssetItem): number => {
+      const leftIndex: number = fieldOrder.indexOf(left.id);
+      const rightIndex: number = fieldOrder.indexOf(right.id);
+      const orderDifference: number = leftIndex - rightIndex;
+      return orderDifference || compareContentAssetItems(left, right);
+    });
+  }
 
-    return [...names, ...descriptions, ...rest];
+  function compareContentAssetItems(left: ContentAssetItem, right: ContentAssetItem): number {
+    return left.id.localeCompare(right.id) || left.lang.localeCompare(right.lang);
   }
 
   function hasNonLocalizedItem(items: ContentAssetItem[], id: string): boolean {

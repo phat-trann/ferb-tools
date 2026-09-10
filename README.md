@@ -12,7 +12,7 @@ Current tools:
 
 ## Version
 
-Current version: `1.18.2`
+Current version: `1.18.3`
 
 Versioning uses semantic versioning:
 
@@ -21,6 +21,10 @@ Versioning uses semantic versioning:
 - Major: breaking storage, package, or workflow change.
 
 ## Version Notes
+
+### 1.18.3
+
+- Orders Content Asset page attributes by the SFCC schema so `<page-title>` is exported before `<page-description>` for both single and list exports.
 
 ### 1.18.2
 
