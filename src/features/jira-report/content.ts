@@ -1,5 +1,5 @@
 namespace FerbToolsJiraReportContentFeature {
-  const WINDOW_FLAG = '__ferbToolsJiraReportBootstrappedV5__';
+  const WINDOW_FLAG = '__ferbToolsJiraReportBootstrappedV6__';
   const PAGE_SIZE = 100;
   const ISSUE_FIELDS: string[] = ['key', 'summary', 'status', 'timeestimate', 'duedate', 'parent'];
 
@@ -26,7 +26,7 @@ namespace FerbToolsJiraReportContentFeature {
           return;
         }
 
-        generateReportsHTML(message.settings)
+        generateReportsHTML(message.settings, message.mode, message.resultDate)
           .then((report: JiraReportResult): void => {
             sendResponse({ success: true, report });
           })
@@ -43,14 +43,27 @@ namespace FerbToolsJiraReportContentFeature {
     );
   }
 
-  async function generateReportsHTML(settings: JiraReportSettings): Promise<JiraReportResult> {
-    const [myself, myTaskRows, todayDoneRows]: [Record<string, unknown>, JiraIssueRow[], JiraIssueRow[]] = await Promise.all([
-      fetchJiraRecord('/rest/api/3/myself'),
-      searchIssues(settings.myTasksJql),
-      searchIssues(settings.todayDoneJql),
-    ]);
+  async function generateReportsHTML(settings: JiraReportSettings, mode: 'work' | 'result', resultDate: string): Promise<JiraReportResult> {
+    const myself: Record<string, unknown> = await fetchJiraRecord('/rest/api/3/myself');
     const displayName: string = readRequiredString(myself.displayName, 'Jira API không trả về display name của user hiện tại.');
     const reportOwner: string = [displayName, normalizeText(settings.role)].filter(Boolean).join(' ');
+
+    if (mode === 'result') {
+      const selectedDate: Date = parseDateInput(resultDate);
+      const resultJql: string = buildResultJql(settings.todayDoneJql, resultDate);
+      const [myTaskRows, doneRows]: [JiraIssueRow[], JiraIssueRow[]] = await Promise.all([
+        searchIssues(settings.myTasksJql),
+        searchIssues(resultJql),
+      ]);
+      const openCount: number = myTaskRows.filter((row: JiraIssueRow): boolean => !row.isDone).length;
+      return {
+        workHtml: '',
+        resultHtml: buildResultHtml(reportOwner, formatDateDDMMYYYY(selectedDate), doneRows, openCount),
+        warnings: [],
+      };
+    }
+
+    const myTaskRows: JiraIssueRow[] = await searchIssues(settings.myTasksJql);
     const today: Date = startOfDay(new Date());
     const tomorrow: Date = addDays(today, 1);
     const weekStart: Date = startOfWeekMonday(today);
@@ -58,13 +71,8 @@ namespace FerbToolsJiraReportContentFeature {
     const delayed: JiraIssueRow[] = [];
     const needToday: JiraIssueRow[] = [];
     const thisWeekInProgress: JiraIssueRow[] = [];
-    let openCount = 0;
 
     myTaskRows.forEach((row: JiraIssueRow): void => {
-      if (!row.isDone) {
-        openCount += 1;
-      }
-
       const due: Date | null = row.dueDate;
       if (!due || row.isDone) {
         return;
@@ -87,9 +95,29 @@ namespace FerbToolsJiraReportContentFeature {
     const todayText: string = formatDateDDMMYYYY(today);
     return {
       workHtml: buildWorkPlanHtml(reportOwner, todayText, delayed, thisWeekInProgress, needToday),
-      resultHtml: buildResultHtml(reportOwner, todayText, todayDoneRows, openCount),
+      resultHtml: '',
       warnings: [],
     };
+  }
+
+  function buildResultJql(configuredJql: string, resultDate: string): string {
+    parseDateInput(resultDate);
+    const orderMatch: RegExpMatchArray | null = configuredJql.match(/\s+ORDER\s+BY\s+(.+)$/i);
+    const orderBy: string = orderMatch ? ` ORDER BY ${orderMatch[1]}` : '';
+    let baseJql: string = orderMatch ? configuredJql.slice(0, orderMatch.index).trim() : configuredJql.trim();
+
+    baseJql = baseJql
+      .replace(/\s+AND\s+status\s+CHANGED\s+TO\s+Done\s+AFTER\s+startOfDay\(\)/gi, '')
+      .replace(/\s+AND\s+status\s+CHANGED\s+TO\s+Done\s+AFTER\s+"[^"]+"\s+BEFORE\s+"[^"]+"/gi, '')
+      .replace(/\s+AND\s+status\s+CHANGED\s+TO\s+Done\s+DURING\s*\([^)]*\)/gi, '')
+      .replace(/\s+AND\s+status\s+CHANGED\s+TO\s+Done\s+ON\s+(?:"[^"]+"|\S+)/gi, '')
+      .trim();
+
+    if (!baseJql) {
+      throw new Error('Result JQL không được để trống.');
+    }
+
+    return `${baseJql} AND status CHANGED TO Done ON "${resultDate}"${orderBy}`;
   }
 
   async function searchIssues(jql: string): Promise<JiraIssueRow[]> {
@@ -323,6 +351,22 @@ namespace FerbToolsJiraReportContentFeature {
     return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null;
   }
 
+  function parseDateInput(value: string): Date {
+    const match: RegExpMatchArray | null = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+      throw new Error('Ngày Result không hợp lệ.');
+    }
+
+    const year: number = Number(match[1]);
+    const month: number = Number(match[2]);
+    const day: number = Number(match[3]);
+    const date: Date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+      throw new Error('Ngày Result không hợp lệ.');
+    }
+    return date;
+  }
+
   function normalizeText(value: string | null | undefined): string {
     return (value ?? '').replace(/\s+/g, ' ').trim();
   }
@@ -373,14 +417,16 @@ namespace FerbToolsJiraReportContentFeature {
   }
 
   function isGenerateMessage(message: unknown): message is JiraReportGenerateMessage {
-    if (!isRecord(message) || message.type !== 'RUN_JIRA_REPORT_GENERATE_V5' || !isRecord(message.settings)) {
+    if (!isRecord(message) || message.type !== 'RUN_JIRA_REPORT_GENERATE_V6' || !isRecord(message.settings)) {
       return false;
     }
 
     return (
       typeof message.settings.role === 'string' &&
       typeof message.settings.myTasksJql === 'string' &&
-      typeof message.settings.todayDoneJql === 'string'
+      typeof message.settings.todayDoneJql === 'string' &&
+      (message.mode === 'work' || message.mode === 'result') &&
+      typeof message.resultDate === 'string'
     );
   }
 

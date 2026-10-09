@@ -69,17 +69,25 @@ namespace FerbToolsPopup {
     FerbToolsJiraReportPopupFeature.init({
       setStatus,
       elements: {
-        section: getElementById('jira-report-section', HTMLDetailsElement),
+        workSection: getElementById('jira-work-plan-section', HTMLDetailsElement),
+        resultSection: getElementById('jira-result-section', HTMLDetailsElement),
         roleInput: getElementById('jira-report-role', HTMLInputElement),
         siteUrlInput: getElementById('jira-worklog-site-url', HTMLInputElement),
         myTasksJqlInput: getElementById('jira-report-my-tasks-jql', HTMLTextAreaElement),
         todayDoneJqlInput: getElementById('jira-report-today-done-jql', HTMLTextAreaElement),
-        generateButton: getElementById('jira-report-generate-button', HTMLButtonElement),
+        workGenerateButton: getElementById('jira-work-plan-generate-button', HTMLButtonElement),
+        resultGenerateButton: getElementById('jira-result-generate-button', HTMLButtonElement),
+        resultDateInput: getElementById('jira-result-date', HTMLInputElement),
         copyWorkButton: getElementById('jira-report-copy-work-button', HTMLButtonElement),
         copyResultButton: getElementById('jira-report-copy-result-button', HTMLButtonElement),
         workPreview: getElementById('jira-report-work-preview', HTMLDivElement),
         resultPreview: getElementById('jira-report-result-preview', HTMLDivElement),
       },
+    });
+
+    FerbToolsSfccToolkitUrlFixPopupFeature.init({
+      enabledInput: getElementById('sfcc-toolkit-url-fix-enabled', HTMLInputElement),
+      setStatus,
     });
 
     FerbToolsVisibilityPopupFeature.init({
@@ -89,7 +97,8 @@ namespace FerbToolsPopup {
         contentAssetInput: getElementById('visible-content-asset', HTMLInputElement),
         contentAssetListInput: getElementById('visible-content-asset-list', HTMLInputElement),
         monthlyKpiInput: getElementById('visible-monthly-kpi', HTMLInputElement),
-        jiraReportInput: getElementById('visible-jira-report', HTMLInputElement),
+        jiraWorkPlanInput: getElementById('visible-jira-work-plan', HTMLInputElement),
+        jiraResultInput: getElementById('visible-jira-result', HTMLInputElement),
         checkInSettings: getElementById('check-in-settings-group', HTMLElement),
         contentAssetSettings: getElementById('content-asset-settings-group', HTMLElement),
         jiraSettings: getElementById('jira-settings-group', HTMLElement),
@@ -100,7 +109,8 @@ namespace FerbToolsPopup {
         contentAssetCard: getElementById('content-asset-section', HTMLElement),
         contentAssetListCard: getElementById('content-asset-list-section', HTMLElement),
         monthlyKpiCard: getElementById('jira-worklog-section', HTMLElement),
-        jiraReportCard: getElementById('jira-report-section', HTMLElement),
+        jiraWorkPlanCard: getElementById('jira-work-plan-section', HTMLElement),
+        jiraResultCard: getElementById('jira-result-section', HTMLElement),
         emptyState: getElementById('tool-visibility-empty', HTMLParagraphElement),
         checkInEnabledInput: getElementById('enabled', HTMLInputElement),
       },

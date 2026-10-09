@@ -2,7 +2,8 @@ namespace FerbToolsJiraReportPopupFeature {
   const JIRA_REPORT_STORAGE_KEY = 'ferbToolsJiraReportLastReport';
   const JIRA_REPORT_SETTINGS_STORAGE_KEY = 'ferbToolsJiraReportSettings';
   const DEFAULT_MY_TASKS_JQL = 'assignee = currentUser() AND statusCategory != Done ORDER BY duedate ASC';
-  const DEFAULT_TODAY_DONE_JQL = 'assignee = currentUser() AND statusCategory = Done AND status CHANGED TO Done AFTER startOfDay() ORDER BY updated DESC';
+  const LEGACY_TODAY_DONE_JQL = 'assignee = currentUser() AND statusCategory = Done AND status CHANGED TO Done AFTER startOfDay() ORDER BY updated DESC';
+  const DEFAULT_TODAY_DONE_JQL = 'assignee = currentUser() AND statusCategory = Done ORDER BY updated DESC';
   const DEFAULT_SETTINGS: JiraReportSettings = {
     role: 'DEV',
     myTasksJql: DEFAULT_MY_TASKS_JQL,
@@ -10,12 +11,15 @@ namespace FerbToolsJiraReportPopupFeature {
   };
 
   export interface Elements {
-    section: HTMLDetailsElement;
+    workSection: HTMLDetailsElement;
+    resultSection: HTMLDetailsElement;
     roleInput: HTMLInputElement;
     siteUrlInput: HTMLInputElement;
     myTasksJqlInput: HTMLTextAreaElement;
     todayDoneJqlInput: HTMLTextAreaElement;
-    generateButton: HTMLButtonElement;
+    workGenerateButton: HTMLButtonElement;
+    resultGenerateButton: HTMLButtonElement;
+    resultDateInput: HTMLInputElement;
     copyWorkButton: HTMLButtonElement;
     copyResultButton: HTMLButtonElement;
     workPreview: HTMLDivElement;
@@ -29,11 +33,19 @@ namespace FerbToolsJiraReportPopupFeature {
 
   export function init(options: Options): void {
     const { elements, setStatus } = options;
+    let lastReport: JiraReportResult = { workHtml: '', resultHtml: '', warnings: [] };
+    let activeMode: 'work' | 'result' | null = null;
 
-    elements.generateButton.addEventListener('click', (event: MouseEvent): void => {
+    elements.workGenerateButton.addEventListener('click', (event: MouseEvent): void => {
       event.preventDefault();
       event.stopPropagation();
-      void generateReport();
+      void generateReport('work');
+    });
+
+    elements.resultGenerateButton.addEventListener('click', (event: MouseEvent): void => {
+      event.preventDefault();
+      event.stopPropagation();
+      void generateReport('result');
     });
 
     elements.copyWorkButton.addEventListener('click', (event: MouseEvent): void => {
@@ -52,12 +64,20 @@ namespace FerbToolsJiraReportPopupFeature {
       });
     });
 
+    elements.resultDateInput.value = getTodayDateInput();
     void loadSettings();
     void loadLastReport();
 
-    async function generateReport(): Promise<void> {
-      elements.section.open = true;
-      setBusy(true, 'Đang mở Jira và generate...');
+    async function generateReport(mode: 'work' | 'result'): Promise<void> {
+      if (activeMode !== null) {
+        setStatus(activeMode === 'work' ? 'Work Plan đang được generate.' : 'Result đang được generate.');
+        return;
+      }
+
+      activeMode = mode;
+      const activeSection: HTMLDetailsElement = mode === 'work' ? elements.workSection : elements.resultSection;
+      activeSection.open = true;
+      setBusy(mode, true, mode === 'work' ? 'Đang generate Work Plan...' : 'Đang generate Result...');
 
       try {
         const settings: JiraReportSettings = readSettingsFromForm();
@@ -73,7 +93,9 @@ namespace FerbToolsJiraReportPopupFeature {
         const response: JiraReportResponse = await sendTabMessage<JiraReportGenerateMessage, JiraReportResponse>(
           tab.id,
           {
-            type: 'RUN_JIRA_REPORT_GENERATE_V5',
+            type: 'RUN_JIRA_REPORT_GENERATE_V6',
+            mode,
+            resultDate: normalizeResultDate(elements.resultDateInput.value),
             settings,
           }
         );
@@ -82,13 +104,24 @@ namespace FerbToolsJiraReportPopupFeature {
           throw new Error(response.error ?? 'Generate Jira report lỗi.');
         }
 
-        renderReport(response.report);
-        await writeLastReport(response.report);
-        setStatus(response.report.warnings.length > 0 ? response.report.warnings.join(' ') : 'Đã generate Jira report.');
+        lastReport = {
+          workHtml: mode === 'work' ? response.report.workHtml : lastReport.workHtml,
+          resultHtml: mode === 'result' ? response.report.resultHtml : lastReport.resultHtml,
+          warnings: response.report.warnings,
+        };
+        if (mode === 'work') {
+          elements.workPreview.innerHTML = response.report.workHtml;
+        } else {
+          elements.resultPreview.innerHTML = response.report.resultHtml;
+        }
+        await writeLastReport(lastReport);
+        const successMessage: string = mode === 'work' ? 'Đã generate Work Plan.' : `Đã generate Result ngày ${formatDateDisplay(elements.resultDateInput.value)}.`;
+        setStatus(response.report.warnings.length > 0 ? response.report.warnings.join(' ') : successMessage);
       } catch (error: unknown) {
         setStatus(error instanceof Error ? error.message : 'Generate Jira report lỗi.');
       } finally {
-        setBusy(false);
+        setBusy(mode, false);
+        activeMode = null;
       }
     }
 
@@ -115,15 +148,20 @@ namespace FerbToolsJiraReportPopupFeature {
       }
     }
 
-    function setBusy(isBusy: boolean, status?: string): void {
-      elements.generateButton.disabled = isBusy;
-      elements.copyWorkButton.disabled = isBusy;
-      elements.copyResultButton.disabled = isBusy;
+    function setBusy(mode: 'work' | 'result', isBusy: boolean, status?: string): void {
+      const generateButton: HTMLButtonElement = mode === 'work' ? elements.workGenerateButton : elements.resultGenerateButton;
+      const copyButton: HTMLButtonElement = mode === 'work' ? elements.copyWorkButton : elements.copyResultButton;
+
+      generateButton.disabled = isBusy;
+      copyButton.disabled = isBusy;
+      if (mode === 'result') {
+        elements.resultDateInput.disabled = isBusy;
+      }
       elements.roleInput.disabled = isBusy;
       elements.siteUrlInput.disabled = isBusy;
       elements.myTasksJqlInput.disabled = isBusy;
       elements.todayDoneJqlInput.disabled = isBusy;
-      elements.generateButton.textContent = isBusy ? '...' : 'Generate';
+      generateButton.textContent = isBusy ? '...' : mode === 'work' ? 'Run Plan' : 'Run Result';
 
       if (status) {
         setStatus(status);
@@ -165,6 +203,7 @@ namespace FerbToolsJiraReportPopupFeature {
         const report: JiraReportResult | null = await readLastReport();
 
         if (report) {
+          lastReport = report;
           renderReport(report);
         }
       } catch (error: unknown) {
@@ -323,7 +362,7 @@ namespace FerbToolsJiraReportPopupFeature {
     return {
       role: normalizeRole(candidate.role ?? extractLegacyRole(candidate.owner ?? candidate.workPlanOwner ?? candidate.resultOwner), DEFAULT_SETTINGS.role),
       myTasksJql: normalizeJql(candidate.myTasksJql, DEFAULT_SETTINGS.myTasksJql),
-      todayDoneJql: normalizeJql(candidate.todayDoneJql, DEFAULT_SETTINGS.todayDoneJql),
+      todayDoneJql: normalizeResultJql(candidate.todayDoneJql),
     };
   }
 
@@ -333,6 +372,28 @@ namespace FerbToolsJiraReportPopupFeature {
 
   function normalizeJql(candidate: unknown, fallback: string): string {
     return typeof candidate === 'string' && candidate.trim() ? candidate.trim() : fallback;
+  }
+
+  function normalizeResultJql(candidate: unknown): string {
+    const value: string = normalizeJql(candidate, DEFAULT_SETTINGS.todayDoneJql);
+    return value === LEGACY_TODAY_DONE_JQL ? DEFAULT_TODAY_DONE_JQL : value;
+  }
+
+  function normalizeResultDate(value: string): string {
+    if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(value)) {
+      throw new Error('Chọn ngày hợp lệ cho Result.');
+    }
+    return value;
+  }
+
+  function getTodayDateInput(): string {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  }
+
+  function formatDateDisplay(value: string): string {
+    const [year, month, day]: string[] = value.split('-');
+    return `${day}/${month}/${year}`;
   }
 
   function extractLegacyRole(candidate: unknown): string {

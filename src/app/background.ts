@@ -818,6 +818,10 @@ namespace FerbToolsBackground {
   }
 
   function roundCheckoutReminderTime(timestamp: number, roundingSlotMinutes: number): number {
+    if (roundingSlotMinutes <= 0) {
+      return timestamp;
+    }
+
     const date: Date = new Date(timestamp);
     const currentMinutes: number = date.getMinutes();
     const remainderMinutes: number = currentMinutes % roundingSlotMinutes;
@@ -1126,7 +1130,7 @@ namespace FerbToolsBackground {
       enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : DEFAULT_SETTINGS.enabled,
       latestCheckInTime: normalizeTimeInput(candidate.latestCheckInTime),
       workDurationMinutes: normalizeIntegerInput(candidate.workDurationMinutes, 30, 24 * 60, DEFAULT_SETTINGS.workDurationMinutes),
-      roundingSlotMinutes: normalizeIntegerInput(candidate.roundingSlotMinutes, 1, 120, DEFAULT_SETTINGS.roundingSlotMinutes),
+      roundingSlotMinutes: normalizeIntegerInput(candidate.roundingSlotMinutes, 0, 120, DEFAULT_SETTINGS.roundingSlotMinutes),
     };
   }
 

@@ -6,7 +6,8 @@ namespace FerbToolsVisibilityPopupFeature {
     contentAsset: boolean;
     contentAssetList: boolean;
     monthlyKpi: boolean;
-    jiraReport: boolean;
+    jiraWorkPlan: boolean;
+    jiraResult: boolean;
   }
 
   export interface Elements {
@@ -14,7 +15,8 @@ namespace FerbToolsVisibilityPopupFeature {
     contentAssetInput: HTMLInputElement;
     contentAssetListInput: HTMLInputElement;
     monthlyKpiInput: HTMLInputElement;
-    jiraReportInput: HTMLInputElement;
+    jiraWorkPlanInput: HTMLInputElement;
+    jiraResultInput: HTMLInputElement;
     checkInSettings: HTMLElement;
     contentAssetSettings: HTMLElement;
     jiraSettings: HTMLElement;
@@ -25,7 +27,8 @@ namespace FerbToolsVisibilityPopupFeature {
     contentAssetCard: HTMLElement;
     contentAssetListCard: HTMLElement;
     monthlyKpiCard: HTMLElement;
-    jiraReportCard: HTMLElement;
+    jiraWorkPlanCard: HTMLElement;
+    jiraResultCard: HTMLElement;
     emptyState: HTMLParagraphElement;
     checkInEnabledInput: HTMLInputElement;
   }
@@ -42,7 +45,8 @@ namespace FerbToolsVisibilityPopupFeature {
       elements.contentAssetInput,
       elements.contentAssetListInput,
       elements.monthlyKpiInput,
-      elements.jiraReportInput,
+      elements.jiraWorkPlanInput,
+      elements.jiraResultInput,
     ];
 
     inputs.forEach((input: HTMLInputElement): void => {
@@ -86,7 +90,8 @@ namespace FerbToolsVisibilityPopupFeature {
         contentAsset: elements.contentAssetInput.checked,
         contentAssetList: elements.contentAssetListInput.checked,
         monthlyKpi: elements.monthlyKpiInput.checked,
-        jiraReport: elements.jiraReportInput.checked,
+        jiraWorkPlan: elements.jiraWorkPlanInput.checked,
+        jiraResult: elements.jiraResultInput.checked,
       };
     }
 
@@ -95,20 +100,22 @@ namespace FerbToolsVisibilityPopupFeature {
       elements.contentAssetInput.checked = settings.contentAsset;
       elements.contentAssetListInput.checked = settings.contentAssetList;
       elements.monthlyKpiInput.checked = settings.monthlyKpi;
-      elements.jiraReportInput.checked = settings.jiraReport;
+      elements.jiraWorkPlanInput.checked = settings.jiraWorkPlan;
+      elements.jiraResultInput.checked = settings.jiraResult;
 
       elements.checkInSettings.hidden = !settings.checkIn;
       elements.contentAssetSettings.hidden = !settings.contentAsset && !settings.contentAssetList;
-      elements.jiraSettings.hidden = !settings.monthlyKpi && !settings.jiraReport;
+      elements.jiraSettings.hidden = !settings.monthlyKpi && !settings.jiraWorkPlan && !settings.jiraResult;
       elements.monthlyKpiAttendanceSetting.hidden = !settings.monthlyKpi;
       elements.monthlyKpiParallelSetting.hidden = !settings.monthlyKpi;
-      elements.jiraReportMyTasksSetting.hidden = !settings.jiraReport;
-      elements.jiraReportTodayDoneSetting.hidden = !settings.jiraReport;
+      elements.jiraReportMyTasksSetting.hidden = !settings.jiraWorkPlan && !settings.jiraResult;
+      elements.jiraReportTodayDoneSetting.hidden = !settings.jiraResult;
       elements.contentAssetCard.hidden = !settings.contentAsset;
       elements.contentAssetListCard.hidden = !settings.contentAssetList;
       elements.monthlyKpiCard.hidden = !settings.monthlyKpi;
-      elements.jiraReportCard.hidden = !settings.jiraReport;
-      elements.emptyState.hidden = settings.contentAsset || settings.contentAssetList || settings.monthlyKpi || settings.jiraReport;
+      elements.jiraWorkPlanCard.hidden = !settings.jiraWorkPlan;
+      elements.jiraResultCard.hidden = !settings.jiraResult;
+      elements.emptyState.hidden = settings.contentAsset || settings.contentAssetList || settings.monthlyKpi || settings.jiraWorkPlan || settings.jiraResult;
     }
 
     async function disableCheckInReminder(): Promise<void> {
@@ -129,7 +136,8 @@ namespace FerbToolsVisibilityPopupFeature {
       contentAsset: true,
       contentAssetList: true,
       monthlyKpi: true,
-      jiraReport: true,
+      jiraWorkPlan: true,
+      jiraResult: true,
     };
     if (!isRecord(candidate)) {
       return defaults;
@@ -139,7 +147,8 @@ namespace FerbToolsVisibilityPopupFeature {
       contentAsset: typeof candidate.contentAsset === 'boolean' ? candidate.contentAsset : defaults.contentAsset,
       contentAssetList: typeof candidate.contentAssetList === 'boolean' ? candidate.contentAssetList : defaults.contentAssetList,
       monthlyKpi: typeof candidate.monthlyKpi === 'boolean' ? candidate.monthlyKpi : defaults.monthlyKpi,
-      jiraReport: typeof candidate.jiraReport === 'boolean' ? candidate.jiraReport : defaults.jiraReport,
+      jiraWorkPlan: typeof candidate.jiraWorkPlan === 'boolean' ? candidate.jiraWorkPlan : typeof candidate.jiraReport === 'boolean' ? candidate.jiraReport : defaults.jiraWorkPlan,
+      jiraResult: typeof candidate.jiraResult === 'boolean' ? candidate.jiraResult : typeof candidate.jiraReport === 'boolean' ? candidate.jiraReport : defaults.jiraResult,
     };
   }
 

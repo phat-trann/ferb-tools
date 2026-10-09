@@ -809,7 +809,7 @@
             </div>
           </div>
           <div class="top-actions">
-            <span id="version" class="version-pill">v1.18.3</span>
+            <span id="version" class="version-pill">v1.20.0</span>
             <button id="settings-open-button" class="icon-button" type="button" title="Settings" aria-label="Open settings" aria-controls="settings-drawer" aria-expanded="false">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <circle cx="12" cy="12" r="3"></circle>
@@ -858,13 +858,32 @@
                     </label>
                   </div>
                   <div class="settings-toggle-row">
-                    <span>Jira Report</span>
-                    <label class="switch" title="Hiện hoặc ẩn Jira Report">
-                      <input id="visible-jira-report" type="checkbox" checked>
+                    <span>Jira Work Plan</span>
+                    <label class="switch" title="Hiện hoặc ẩn Jira Work Plan">
+                      <input id="visible-jira-work-plan" type="checkbox" checked>
+                      <span aria-hidden="true"></span>
+                    </label>
+                  </div>
+                  <div class="settings-toggle-row">
+                    <span>Jira Result</span>
+                    <label class="switch" title="Hiện hoặc ẩn Jira Result">
+                      <input id="visible-jira-result" type="checkbox" checked>
                       <span aria-hidden="true"></span>
                     </label>
                   </div>
                 </div>
+              </section>
+
+              <section class="settings-group" aria-labelledby="sfcc-toolkit-url-fix-title">
+                <h3 id="sfcc-toolkit-url-fix-title">SFCC Toolkit</h3>
+                <div class="settings-toggle-row">
+                  <span>Fix Storefront Editing URL</span>
+                  <label class="switch" title="Bật hoặc tắt tự động sửa SFCC Toolkit URL">
+                    <input id="sfcc-toolkit-url-fix-enabled" type="checkbox" checked>
+                    <span aria-hidden="true"></span>
+                  </label>
+                </div>
+                <p class="note">Tự động sửa Storefront Editing URL về đúng host.</p>
               </section>
 
               <section id="check-in-settings-group" class="settings-group" aria-labelledby="check-in-settings-title">
@@ -889,6 +908,7 @@
                     <label>
                       Làm tròn
                       <select id="rounding-slot-minutes">
+                        <option value="0">Không làm tròn</option>
                         <option value="15">15 phút</option>
                         <option value="30">30 phút</option>
                         <option value="60">60 phút</option>
@@ -948,8 +968,8 @@
                   <textarea id="jira-report-my-tasks-jql" spellcheck="false">assignee = currentUser() AND statusCategory != Done ORDER BY duedate ASC</textarea>
                 </label>
                 <label id="jira-report-today-done-setting">
-                  Today Done JQL
-                  <textarea id="jira-report-today-done-jql" spellcheck="false">assignee = currentUser() AND statusCategory = Done AND status CHANGED TO Done AFTER startOfDay() ORDER BY updated DESC</textarea>
+                  Result JQL (ngày được thêm tự động)
+                  <textarea id="jira-report-today-done-jql" spellcheck="false">assignee = currentUser() AND statusCategory = Done ORDER BY updated DESC</textarea>
                 </label>
               </section>
             </div>
@@ -1022,13 +1042,13 @@
             </div>
           </details>
 
-          <details id="jira-report-section" class="tool-card">
+          <details id="jira-work-plan-section" class="tool-card">
             <summary class="tool-summary">
               <div>
-                <h2>Jira Report</h2>
+                <h2>Jira Work Plan</h2>
               </div>
               <span class="summary-actions">
-                <button id="jira-report-generate-button" class="tool-button" type="button">Generate</button>
+                  <button id="jira-work-plan-generate-button" class="tool-button" type="button">Run Plan</button>
                 <span class="expand-pill" aria-hidden="true">›</span>
               </span>
             </summary>
@@ -1040,6 +1060,24 @@
                 </div>
                 <div id="jira-report-work-preview" class="report-preview" contenteditable="true"></div>
               </div>
+            </div>
+          </details>
+
+          <details id="jira-result-section" class="tool-card">
+            <summary class="tool-summary">
+              <div>
+                <h2>Jira Result</h2>
+              </div>
+              <span class="summary-actions">
+                  <button id="jira-result-generate-button" class="tool-button" type="button">Run Result</button>
+                <span class="expand-pill" aria-hidden="true">›</span>
+              </span>
+            </summary>
+            <div class="tool-setup">
+              <label>
+                Result date
+                <input id="jira-result-date" type="date">
+              </label>
               <div class="report-block">
                 <div class="report-header">
                   <span>Result</span>
@@ -1063,6 +1101,7 @@
     <script src="../shared/background-tabs.js"></script>
     <script src="../features/jira-worklog/popup.js"></script>
     <script src="../features/jira-report/popup.js"></script>
+    <script src="../features/sfcc-toolkit-url-fix/popup.js"></script>
     <script src="../app/popup.js"></script>
   </body>
 </html>

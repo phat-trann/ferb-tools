@@ -8,11 +8,13 @@ Current tools:
 - Content Asset Export: sends a message to `src/features/content-asset/content-asset-export.ts` on the current Business Manager tab.
 - Content Asset List Export: exports multiple SFCC content assets into one library XML file.
 - Monthly KPI: combines the signed-in user's Jira REST API data with actual 1Office attendance through yesterday.
-- Jira Report: generates Work Plan and Result HTML entirely from Jira REST API v3 using configurable JQL.
+- Jira Work Plan: generates the current Work Plan independently through Jira REST API v3.
+- Jira Result: generates Result independently for a selected date through Jira REST API v3.
+- Fix SFCC Toolkit URL: rewrites Storefront Editing links to the correct STG or DEV Business Manager host.
 
 ## Version
 
-Current version: `1.18.3`
+Current version: `1.20.0`
 
 Versioning uses semantic versioning:
 
@@ -21,6 +23,23 @@ Versioning uses semantic versioning:
 - Major: breaking storage, package, or workflow change.
 
 ## Version Notes
+
+### 1.20.0
+
+- Adds a saved on/off setting for Fix SFCC Toolkit URL.
+- Rewrites existing, dynamically added, modified, and clicked Storefront Editing links to the correct STG or DEV host.
+- Prefixes feature console messages with the FerbTools name and current extension version.
+
+### 1.19.1
+
+- Fixes the split Jira report actions so each Run button has its own busy state and updates only its matching preview.
+
+### 1.19.0
+
+- Adds a `Không làm tròn` (`0 phút`) option to Check-in Reminder so checkout can use the exact calculated time.
+- Splits Jira Report into independent Jira Work Plan and Jira Result cards with separate Generate and Copy actions.
+- Adds a Result date picker, defaults it to today, and applies the selected full-day range to Jira JQL automatically.
+- Splits visibility controls for Jira Work Plan and Jira Result while migrating the previous Jira Report visibility setting.
 
 ### 1.18.3
 
@@ -300,6 +319,8 @@ src/
   features/content-asset/popup.ts
   features/check-in/content.ts
   features/check-in/popup.ts
+  features/sfcc-toolkit-url-fix/content.ts
+  features/sfcc-toolkit-url-fix/popup.ts
   shared/types.d.ts
 static/
   icons/

@@ -104,7 +104,9 @@ interface ContentAssetExportProgressMessage {
 }
 
 interface JiraReportGenerateMessage {
-  type: "RUN_JIRA_REPORT_GENERATE_V5";
+  type: "RUN_JIRA_REPORT_GENERATE_V6";
+  mode: "work" | "result";
+  resultDate: string;
   settings: JiraReportSettings;
 }
 

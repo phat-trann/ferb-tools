@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description"
-    content="FerbTools v1.18.3 is a configurable Chrome MV3 toolkit for check-in reminders, SFCC content asset exports, monthly KPI tracking, and API-powered Work Plan and Result reports. Made by Ferb.">
+    content="FerbTools v1.20.0 is a configurable Chrome MV3 toolkit for check-in reminders, SFCC content asset exports and Toolkit URL fixes, monthly KPI tracking, and date-selectable API-powered Work Plan and Result reports. Made by Ferb.">
   <link rel="icon" type="image/png" sizes="128x128" href="./assets/icon-128.png">
   <link rel="apple-touch-icon" href="./assets/icon-128.png">
   <title>FerbTools - Chrome Extension Toolkit</title>
@@ -360,7 +360,7 @@
           <img src="./assets/icon-128.png" width="44" height="44" alt="" aria-hidden="true">
         </span>
         <span>FerbTools</span>
-        <span class="brand-version">v1.18.3</span>
+        <span class="brand-version">v1.20.0</span>
       </a>
       <div class="nav-links">
         <a href="https://github.com/phat-trann/ferb-tools" rel="noreferrer" target="_blank"
@@ -382,7 +382,7 @@
 
     <section id="top" class="hero">
       <div>
-        <p class="eyebrow">Chrome MV3 toolkit · Version 1.18.3</p>
+        <p class="eyebrow">Chrome MV3 toolkit · Version 1.20.0</p>
         <h1>Check in. Export content. Report work.</h1>
         <p class="lead">
           FerbTools brings daily check-in reminders, SFCC Content Asset XML exports, batch content exports, personal
@@ -430,21 +430,21 @@
             <span class="setup-value">PASS / FAIL</span>
           </div>
           <div class="setup-field">
-            <span>Jira Report</span>
-            <span class="setup-value">Plan + Result</span>
+            <span>Jira Work Plan / Result</span>
+            <span class="setup-value">Separate</span>
           </div>
         </div>
       </aside>
     </section>
 
     <section id="features" class="section">
-      <p class="eyebrow">Current tools · v1.18.3</p>
-      <h2>Five workflows, one focused popup.</h2>
+      <p class="eyebrow">Current tools · v1.20.0</p>
+      <h2>Seven workflows, one focused popup.</h2>
       <div class="grid">
         <article class="card">
           <h3>Check-in Reminder</h3>
-          <p>Records today's check-in, calculates the checkout time from your work duration, rounds it to the selected
-            slot, and keeps the action badge in sync.</p>
+          <p>Records today's check-in, calculates the checkout time from your work duration, optionally rounds it to
+            the selected slot, and keeps the action badge in sync.</p>
           <p class="detail">Includes editable daily data, clear-day action, weekday-aware prompts, late check-in
             handling, snooze, and checkout reminders.</p>
         </article>
@@ -478,10 +478,16 @@
         </article>
         <article class="card">
           <h3>Jira Result</h3>
-          <p>Loads the configured “Today Done” JQL, lists completed tasks, and reports the current open-ticket count
-            in copy-ready HTML and plain text.</p>
-          <p class="detail">Work Plan and Result previews remain editable and the most recently generated report is
-            restored when the popup reopens. Jira is reused or opened automatically when Generate runs.</p>
+          <p>Loads the configured Result JQL, lists completed tasks for the selected date, and reports the current
+            open-ticket count in copy-ready HTML and plain text.</p>
+          <p class="detail">Work Plan and Result run independently, remain editable, and restore their most recent
+            output when the popup reopens. The Result date defaults to today.</p>
+        </article>
+        <article class="card">
+          <h3>Fix SFCC Toolkit URL</h3>
+          <p>Rewrites Storefront Editing links to the correct staging or development Business Manager host.</p>
+          <p class="detail">Handles existing links, Toolkit DOM updates, and captured clicks. The saved Settings toggle
+            enables or stops the feature immediately.</p>
         </article>
         <article class="card">
           <h3>Saved configuration</h3>
@@ -523,7 +529,7 @@
     </section>
 
     <footer class="footer">
-      FerbTools v1.18.3. Made by Ferb.
+      FerbTools v1.20.0. Made by Ferb.
     </footer>
   </main>
 </body>
