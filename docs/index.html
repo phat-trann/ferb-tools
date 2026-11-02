@@ -5,14 +5,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description"
-    content="FerbTools v1.20.1 is a configurable Chrome MV3 toolkit for check-in reminders, SFCC content asset exports and Toolkit URL fixes, monthly KPI tracking, and date-selectable API-powered Work Plan and Result reports. Made by Ferb.">
+    content="FerbTools: check-in reminders, SFCC content exports, monthly KPI, and Jira reports in one Chrome extension. Light, Dark, and System appearance. Made by Ferb.">
   <link rel="icon" type="image/png" sizes="128x128" href="./assets/icon-128.png">
   <link rel="apple-touch-icon" href="./assets/icon-128.png">
   <title>FerbTools - Chrome Extension Toolkit</title>
   <style>
     :root {
-      color: #13231e;
-      background: #fff7ed;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      color: #172033;
+      background: #eef2f7;
       font-family: "Noto Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
       font-size: 16px;
       line-height: 1.5;
@@ -24,11 +26,11 @@
 
     body {
       margin: 0;
-      color: #13231e;
+      color: #172033;
       background:
-        radial-gradient(circle at 10% 8%, rgba(20, 184, 166, 0.28), transparent 28rem),
-        radial-gradient(circle at 90% 0%, rgba(251, 146, 60, 0.28), transparent 26rem),
-        linear-gradient(135deg, #fff7ed 0%, #fef3c7 46%, #d1fae5 100%);
+        radial-gradient(circle at 10% 8%, rgba(37, 99, 235, 0.18), transparent 28rem),
+        radial-gradient(circle at 90% 0%, rgba(96, 165, 250, 0.2), transparent 26rem),
+        linear-gradient(135deg, #f8fafc 0%, #eff6ff 46%, #dbeafe 100%);
     }
 
     a {
@@ -111,7 +113,7 @@
 
     .eyebrow {
       margin: 0 0 14px;
-      color: #c2410c;
+      color: var(--primary);
       font-size: 0.78rem;
       font-weight: 900;
       letter-spacing: 0.22em;
@@ -168,8 +170,8 @@
 
     .button.primary {
       border-color: transparent;
-      color: #fff7ed;
-      background: linear-gradient(135deg, #0f766e, #14b8a6);
+      color: #ffffff;
+      background: linear-gradient(135deg, var(--primary-hover), var(--primary));
     }
 
     .product-card {
@@ -191,39 +193,7 @@
       width: 220px;
       height: 220px;
       border-radius: 999px;
-      background: radial-gradient(circle, rgba(20, 184, 166, 0.34), transparent 70%);
-    }
-
-    .badge-row {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 10px;
-      margin-bottom: 24px;
-    }
-
-    .status-badge {
-      border-radius: 16px;
-      padding: 12px 8px;
-      color: #fff7ed;
-      font-size: 0.85rem;
-      font-weight: 900;
-      text-align: center;
-    }
-
-    .status-badge.off {
-      background: #64748b;
-    }
-
-    .status-badge.pending {
-      background: #dc2626;
-    }
-
-    .status-badge.countdown {
-      background: #f59e0b;
-    }
-
-    .status-badge.ready {
-      background: #2563eb;
+      background: radial-gradient(circle, rgba(37, 99, 235, 0.22), transparent 70%);
     }
 
     .setup-panel {
@@ -233,7 +203,7 @@
       gap: 12px;
       border-radius: 28px;
       padding: 22px;
-      background: #fff7ed;
+      background: #eff6ff;
     }
 
     .setup-field {
@@ -249,7 +219,7 @@
     }
 
     .setup-value {
-      color: #0f766e;
+      color: var(--primary);
     }
 
     .section {
@@ -277,15 +247,9 @@
       color: rgba(15, 23, 42, 0.68);
     }
 
-    .card .detail {
-      margin-top: 10px;
-      color: rgba(15, 23, 42, 0.54);
-      font-size: 0.88rem;
-    }
-
     .steps {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 16px;
     }
 
@@ -296,19 +260,9 @@
       margin-bottom: 18px;
       place-items: center;
       border-radius: 14px;
-      color: #fff7ed;
-      background: #0f766e;
+      color: #ffffff;
+      background: var(--primary);
       font-weight: 900;
-    }
-
-    pre {
-      overflow: auto;
-      border: 1px solid rgba(15, 23, 42, 0.1);
-      border-radius: 24px;
-      padding: 22px;
-      background: #13231e;
-      color: #d1fae5;
-      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.16);
     }
 
     code {
@@ -345,9 +299,6 @@
         justify-content: flex-start;
       }
 
-      .badge-row {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
     }
   </style>
 </head>
@@ -376,21 +327,19 @@
         <a href="https://github.com/phat-trann/ferb-tools/releases" rel="noreferrer" target="_blank">Releases</a>
         <a href="#features">Features</a>
         <a href="#install">Install</a>
-        <a href="https://github.com/phat-trann/ferb-tools#version-notes" rel="noreferrer" target="_blank">Version Notes</a>
       </div>
     </nav>
 
     <section id="top" class="hero">
       <div>
-        <p class="eyebrow">Chrome MV3 toolkit · Version 1.20.1</p>
-        <h1>Check in. Export content. Report work.</h1>
+        <p class="eyebrow">Chrome extension</p>
+        <h1>Check in. Export. Report.</h1>
         <p class="lead">
-          FerbTools brings daily check-in reminders, SFCC Content Asset XML exports, batch content exports, personal
-          monthly Jira KPI tracking, and Work Plan and Result reports into one compact Chrome extension popup.
+          Daily reminders, SFCC content exports, and personal Jira reports in one place.
         </p>
         <div class="actions">
           <a class="button primary" href="https://github.com/phat-trann/ferb-tools/releases" rel="noreferrer"
-            target="_blank">Download Release</a>
+            target="_blank">Download</a>
           <a class="button" href="https://github.com/phat-trann/ferb-tools" rel="noreferrer" target="_blank"
             style="display: flex; gap: 6px; align-items: center;">
             <svg aria-hidden="true" focusable="false" class="octicon octicon-mark-github" viewBox="0 0 24 24" width="25"
@@ -400,30 +349,19 @@
                 d="M10.226 17.284c-2.965-.36-5.054-2.493-5.054-5.256 0-1.123.404-2.336 1.078-3.144-.292-.741-.247-2.314.09-2.965.898-.112 2.111.36 2.83 1.01.853-.269 1.752-.404 2.853-.404 1.1 0 1.999.135 2.807.382.696-.629 1.932-1.1 2.83-.988.315.606.36 2.179.067 2.942.72.854 1.101 2 1.101 3.167 0 2.763-2.089 4.852-5.098 5.234.763.494 1.28 1.572 1.28 2.807v2.336c0 .674.561 1.056 1.235.786 4.066-1.55 7.255-5.615 7.255-10.646C23.5 6.188 18.334 1 11.978 1 5.62 1 .5 6.188.5 12.545c0 4.986 3.167 9.12 7.435 10.669.606.225 1.19-.18 1.19-.786V20.63a2.9 2.9 0 0 1-1.078.224c-1.483 0-2.359-.808-2.987-2.313-.247-.607-.517-.966-1.034-1.033-.27-.023-.359-.135-.359-.27 0-.27.45-.471.898-.471.652 0 1.213.404 1.797 1.235.45.651.921.943 1.483.943.561 0 .92-.202 1.437-.719.382-.381.674-.718.944-.943">
               </path>
             </svg>View on GitHub</a>
-          <a class="button" href="#install">Load In Chrome</a>
+          <a class="button" href="#install">How to install</a>
         </div>
       </div>
 
       <aside class="product-card" aria-label="FerbTools tool preview">
-        <div class="badge-row">
-          <span class="status-badge off">IN</span>
-          <span class="status-badge pending">XML</span>
-          <span class="status-badge countdown">LIST</span>
-          <span class="status-badge countdown">WORK</span>
-          <span class="status-badge ready">JIRA</span>
-        </div>
         <div class="setup-panel">
           <div class="setup-field">
             <span>Check-in Reminder</span>
             <span class="setup-value">Daily</span>
           </div>
           <div class="setup-field">
-            <span>Content Asset Export</span>
-            <span class="setup-value">XML</span>
-          </div>
-          <div class="setup-field">
-            <span>Content Asset List Export</span>
-            <span class="setup-value">Batch</span>
+            <span>SFCC Content Export</span>
+            <span class="setup-value">Single / Batch</span>
           </div>
           <div class="setup-field">
             <span>Monthly KPI</span>
@@ -431,100 +369,74 @@
           </div>
           <div class="setup-field">
             <span>Jira Work Plan / Result</span>
-            <span class="setup-value">Separate</span>
+            <span class="setup-value">Copy-ready</span>
+          </div>
+          <div class="setup-field">
+            <span>Appearance</span>
+            <span class="setup-value">Light / Dark / System</span>
           </div>
         </div>
       </aside>
     </section>
 
     <section id="features" class="section">
-      <p class="eyebrow">Current tools · v1.20.1</p>
-      <h2>Seven workflows, one focused popup.</h2>
+      <p class="eyebrow">Features</p>
+      <h2>Tools for your daily work.</h2>
       <div class="grid">
         <article class="card">
           <h3>Check-in Reminder</h3>
-          <p>Records today's check-in, calculates the checkout time from your work duration, optionally rounds it to
-            the selected slot, and keeps the action badge in sync.</p>
-          <p class="detail">Includes editable daily data, clear-day action, weekday-aware prompts, late check-in
-            handling, snooze, and checkout reminders.</p>
+          <p>Save your check-in time and get a reminder when it is time to check out. Choose your work hours and rounding.</p>
         </article>
         <article class="card">
           <h3>Content Asset Export</h3>
-          <p>Builds an SFCC library XML file from the Content Asset detail page, including localized, site-specific,
-            custom, page, sitemap, and folder-link data.</p>
-          <p class="detail">Saved locale and site-ID mapping settings let the generated XML match each Business
-            Manager environment.</p>
+          <p>Export one content asset as XML from its SFCC detail page, including translations and site-specific data.</p>
         </article>
         <article class="card">
           <h3>Content Asset List Export</h3>
-          <p>Searches and exports multiple Content Asset IDs into one XML file from the SFCC content list page, with a
-            configurable filename and parallel worker count.</p>
-          <p class="detail">Accepts IDs separated by whitespace, commas, or semicolons and derives the shared library
-            wrapper from the first content with active-list fallback.</p>
+          <p>Paste content IDs on the SFCC search page and export them together into one XML file.</p>
         </article>
         <article class="card">
           <h3>Monthly KPI</h3>
-          <p>Combines the signed-in user's Jira REST API data with actual 1Office attendance through yesterday for the
-            selected month.</p>
-          <p class="detail">Tracks Working time, On Deadline, Bug fix time capped at 10%, manual Production Issue,
-            and NC process compliance with target markers and per-metric plus overall PASS/FAIL status.</p>
+          <p>Track work time, deadlines, bug fixing, production issues, and NCs using Jira and 1Office data for your selected month.</p>
         </article>
         <article class="card">
           <h3>Jira Work Plan</h3>
-          <p>Loads the configured “My tasks” JQL through Jira REST API v3 and groups open tickets into delayed, due
-            this week, and due today sections.</p>
-          <p class="detail">Each task includes its estimate in bold; a Jira value of 0 minutes is normalized to 30
-            minutes. Report headings use the signed-in user's Jira API display name plus the configured role.</p>
+          <p>Create an editable plan with overdue tasks, upcoming deadlines, and estimates. Copy it when ready.</p>
         </article>
         <article class="card">
           <h3>Jira Result</h3>
-          <p>Loads the configured Result JQL, lists completed tasks for the selected date, and reports the current
-            open-ticket count in copy-ready HTML and plain text.</p>
-          <p class="detail">Work Plan and Result run independently, remain editable, and restore their most recent
-            output when the popup reopens. The Result date defaults to today.</p>
+          <p>Choose a date, generate your completed-task report, then edit and copy it.</p>
         </article>
         <article class="card">
           <h3>Fix SFCC Toolkit URL</h3>
-          <p>Rewrites Storefront Editing links to the correct staging or development Business Manager host.</p>
-          <p class="detail">Handles existing links, Toolkit DOM updates, and captured clicks. The saved Settings toggle
-            enables or stops the feature immediately.</p>
+          <p>Keep Storefront Editing links pointing to the right STG or DEV host, with a simple on/off switch.</p>
         </article>
         <article class="card">
-          <h3>Saved configuration</h3>
-          <p>Long-lived tool settings are grouped in one drawer behind the header gear icon, including check-in
-            preferences, Content Asset setup, Jira and 1Office URLs, Role, and report JQL queries. Appearance follows
-            the system by default, with saved Light and Dark overrides.</p>
-          <p class="detail">Visibility toggles can hide unused functions and their settings. The popup reads its displayed version directly from the extension manifest to stay aligned
-            with each build.</p>
+          <h3>Make it yours</h3>
+          <p>Choose Light, Dark, or System appearance. Hide unused tools and manage your settings from the gear icon.</p>
         </article>
       </div>
     </section>
 
     <section id="install" class="section">
-      <p class="eyebrow">Chrome install</p>
-      <h2>Download the release, then load it in Chrome.</h2>
+      <p class="eyebrow">Install</p>
+      <h2>Ready in three steps.</h2>
       <div class="steps">
         <article class="step">
           <span class="step-number">1</span>
-          <h3>Open releases</h3>
-          <p>Go to <a href="https://github.com/phat-trann/ferb-tools/releases" rel="noreferrer" target="_blank">GitHub
-              Releases</a>.</p>
+          <h3>Download and unzip</h3>
+          <p>Get <code>ferbtools-production.zip</code> from <a href="https://github.com/phat-trann/ferb-tools/releases"
+              rel="noreferrer" target="_blank">Releases</a> and extract it.</p>
         </article>
         <article class="step">
           <span class="step-number">2</span>
-          <h3>Download package</h3>
-          <p>Download <code>ferbtools-production.zip</code> from the latest release.</p>
+          <h3>Enable Developer mode</h3>
+          <p>Open <code>chrome://extensions</code> in Chrome and turn on <code>Developer mode</code>.</p>
         </article>
         <article class="step">
           <span class="step-number">3</span>
-          <h3>Unzip files</h3>
-          <p>Extract the zip file into a local folder.</p>
-        </article>
-        <article class="step">
-          <span class="step-number">4</span>
           <h3>Load unpacked</h3>
-          <p>Open <code>chrome://extensions</code>, enable <code>Developer mode</code>, then choose the extracted
-            folder.</p>
+          <p>Select <code>Load unpacked</code>, choose the extracted folder, and open FerbTools from the toolbar.</p>
         </article>
       </div>
     </section>
