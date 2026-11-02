@@ -43,7 +43,11 @@ function bootstrapContentScript(): void {
     currentNoticeKind: null
   };
 
-  chrome.runtime.onMessage.addListener((message: unknown): void => {
+  chrome.runtime.onMessage.addListener((message: unknown, sender: chrome.runtime.MessageSender): void => {
+    if (sender.id !== chrome.runtime.id) {
+      return;
+    }
+
     if (isShowDailyCheckInPromptMessage(message)) {
       renderDailyCheckInPrompt(state, message);
       return;
@@ -64,7 +68,9 @@ function renderDailyCheckInPrompt(
   state: NoticeContentState,
   message: NoticeShowDailyCheckInPromptMessage
 ): void {
-  const elements: NoticeContentElements = replaceNoticeElements(state);
+  const isExistingCheckInPrompt: boolean = state.elements !== null && state.currentNoticeKind === "checkin";
+  const preservedCheckInTime: string | null = isExistingCheckInPrompt && state.isCheckInTimeEdited ? state.elements!.checkInTimeInput.value : null;
+  const elements: NoticeContentElements = isExistingCheckInPrompt ? state.elements! : replaceNoticeElements(state);
   const lateMessage: string = message.isLate ? ` • ${message.lateMessage ?? ""}` : "";
 
   state.currentNoticeKind = "checkin";
@@ -73,9 +79,9 @@ function renderDailyCheckInPrompt(
   elements.title.textContent = "Bạn đã check in chưa?";
   elements.body.textContent =
     "Lưu lại thời điểm bắt đầu làm việc để extension nhắc bạn checkout đúng giờ";
-  state.isCheckInTimeEdited = false;
+  state.isCheckInTimeEdited = preservedCheckInTime !== null;
   elements.checkInTimeField.hidden = false;
-  elements.checkInTimeInput.value = formatTimeInput(Date.now());
+  elements.checkInTimeInput.value = preservedCheckInTime ?? formatTimeInput(Date.now());
   elements.checkInTimeInput.disabled = false;
   elements.checkInTimeInput.oninput = (): void => {
     state.isCheckInTimeEdited = true;

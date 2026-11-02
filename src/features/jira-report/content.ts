@@ -19,10 +19,10 @@ namespace FerbToolsJiraReportContentFeature {
     chrome.runtime.onMessage.addListener(
       (
         message: unknown,
-        _sender: chrome.runtime.MessageSender,
+        sender: chrome.runtime.MessageSender,
         sendResponse: (response: JiraReportResponse) => void
       ): boolean | void => {
-        if (!isGenerateMessage(message)) {
+        if (sender.id !== chrome.runtime.id || !isGenerateMessage(message)) {
           return;
         }
 
@@ -44,17 +44,20 @@ namespace FerbToolsJiraReportContentFeature {
   }
 
   async function generateReportsHTML(settings: JiraReportSettings, mode: 'work' | 'result', resultDate: string): Promise<JiraReportResult> {
-    const myself: Record<string, unknown> = await fetchJiraRecord('/rest/api/3/myself');
-    const displayName: string = readRequiredString(myself.displayName, 'Jira API không trả về display name của user hiện tại.');
-    const reportOwner: string = [displayName, normalizeText(settings.role)].filter(Boolean).join(' ');
+    if (window.location.origin !== normalizeOrigin(settings.siteUrl)) {
+      throw new Error('Tab hiện tại không khớp Jira site URL đã cấu hình.');
+    }
 
     if (mode === 'result') {
       const selectedDate: Date = parseDateInput(resultDate);
       const resultJql: string = buildResultJql(settings.todayDoneJql, resultDate);
-      const [myTaskRows, doneRows]: [JiraIssueRow[], JiraIssueRow[]] = await Promise.all([
+      const [myself, myTaskRows, doneRows]: [Record<string, unknown>, JiraIssueRow[], JiraIssueRow[]] = await Promise.all([
+        fetchJiraRecord('/rest/api/3/myself'),
         searchIssues(settings.myTasksJql),
         searchIssues(resultJql),
       ]);
+      const displayName: string = readRequiredString(myself.displayName, 'Jira API không trả về display name của user hiện tại.');
+      const reportOwner: string = [displayName, normalizeText(settings.role)].filter(Boolean).join(' ');
       const openCount: number = myTaskRows.filter((row: JiraIssueRow): boolean => !row.isDone).length;
       return {
         workHtml: '',
@@ -63,7 +66,12 @@ namespace FerbToolsJiraReportContentFeature {
       };
     }
 
-    const myTaskRows: JiraIssueRow[] = await searchIssues(settings.myTasksJql);
+    const [myself, myTaskRows]: [Record<string, unknown>, JiraIssueRow[]] = await Promise.all([
+      fetchJiraRecord('/rest/api/3/myself'),
+      searchIssues(settings.myTasksJql),
+    ]);
+    const displayName: string = readRequiredString(myself.displayName, 'Jira API không trả về display name của user hiện tại.');
+    const reportOwner: string = [displayName, normalizeText(settings.role)].filter(Boolean).join(' ');
     const today: Date = startOfDay(new Date());
     const tomorrow: Date = addDays(today, 1);
     const weekStart: Date = startOfWeekMonday(today);
@@ -117,7 +125,7 @@ namespace FerbToolsJiraReportContentFeature {
       throw new Error('Result JQL không được để trống.');
     }
 
-    return `${baseJql} AND status CHANGED TO Done ON "${resultDate}"${orderBy}`;
+    return `(${baseJql}) AND status CHANGED TO Done ON "${resultDate}"${orderBy}`;
   }
 
   async function searchIssues(jql: string): Promise<JiraIssueRow[]> {
@@ -422,12 +430,21 @@ namespace FerbToolsJiraReportContentFeature {
     }
 
     return (
+      typeof message.settings.siteUrl === 'string' &&
       typeof message.settings.role === 'string' &&
       typeof message.settings.myTasksJql === 'string' &&
       typeof message.settings.todayDoneJql === 'string' &&
       (message.mode === 'work' || message.mode === 'result') &&
       typeof message.resultDate === 'string'
     );
+  }
+
+  function normalizeOrigin(siteUrl: string): string {
+    try {
+      return new URL(siteUrl).origin;
+    } catch {
+      throw new Error('Jira site URL không hợp lệ.');
+    }
   }
 
   function isRecord(value: unknown): value is Record<string, unknown> {

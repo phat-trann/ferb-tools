@@ -37,8 +37,14 @@ namespace FerbToolsContentAssetExport {
   }
 
   interface LocalePage {
-    html: string;
+    html?: string;
+    doc?: Document;
     url: string;
+  }
+
+  interface ContentListSearchConfig {
+    searchUrl: string;
+    baseParams: URLSearchParams;
   }
 
   interface ContentAssetExportWindow extends Window {
@@ -82,7 +88,10 @@ namespace FerbToolsContentAssetExport {
   const PAGE_FIELDS = ['pageTitle', 'pageDescription', 'pageKeywords', 'pageURL'];
   const IGNORED_FIELDS = ['ID'];
   const GROUP_KEYS: ContentAssetGroupKey[] = ['generic', 'page', 'custom', 'sitemap'];
+  const DEFAULT_REQUEST_CONCURRENCY = 6;
   let activeSettings: ContentAssetSettings = FerbToolsContentAssetConfig.createDefaultSettings();
+  let activeRequestLimiter: TaskLimiter = createTaskLimiter(DEFAULT_REQUEST_CONCURRENCY);
+  let activeSiteDocCache: Map<string, Promise<Document>> = new Map<string, Promise<Document>>();
 
   const renderers: Record<ContentAssetGroupKey, Renderer> & {
     cleanup: (items: ContentAssetItem[]) => ContentAssetItem[];
@@ -98,7 +107,12 @@ namespace FerbToolsContentAssetExport {
 
     async getDataBySite(url: string, openingTag: string, closingTag: string, formatValues?: SiteValueFormatter): Promise<string> {
       let siteSpecificXml = '';
-      const doc: Document = await fetchHtmlDocument(url);
+      let docPromise: Promise<Document> | undefined = activeSiteDocCache.get(url);
+      if (!docPromise) {
+        docPromise = activeRequestLimiter((): Promise<Document> => fetchHtmlDocument(url));
+        activeSiteDocCache.set(url, docPromise);
+      }
+      const doc: Document = await docPromise;
       const uncheckedInputs: NodeListOf<HTMLInputElement> = doc.querySelectorAll('input[type="checkbox"]:not(:checked)');
 
       uncheckedInputs.forEach((input: HTMLInputElement): void => {
@@ -119,7 +133,7 @@ namespace FerbToolsContentAssetExport {
 
         if (siteId) {
           const containerId: string = containerNode.id.split('_Container')[0];
-          const siteValues: string[] = Array.from(wrapperContainer.querySelectorAll<HTMLInputElement>(`[name=${containerId}]`)).map((valueInput: HTMLInputElement): string => escapeXmlValue(valueInput.value));
+          const siteValues: string[] = Array.from(wrapperContainer.querySelectorAll<HTMLInputElement>(`[name="${escapeCssValue(containerId)}"]`)).map((valueInput: HTMLInputElement): string => escapeXmlValue(valueInput.value));
           const effectiveValues: string[] = siteValues.filter(isEffectiveValue);
           if (effectiveValues.length === 0) {
             return;
@@ -130,7 +144,7 @@ namespace FerbToolsContentAssetExport {
             return;
           }
 
-          siteSpecificXml += `${openingTag.replace('###', siteId)}${renderedValue}${closingTag}\n`;
+          siteSpecificXml += `${openingTag.replace('###', (): string => escapeXmlAttribute(siteId))}${renderedValue}${closingTag}\n`;
         }
       });
 
@@ -149,7 +163,7 @@ namespace FerbToolsContentAssetExport {
             return defaultXml + siteSpecificText;
           }
 
-          return `${item.id !== 'name' ? '    ' : '' }        <${fieldTag}${item.isLocalized ? ` xml:lang="${item.lang}">` : '>'}${item.values[0]}</${fieldTag}>\n`;
+          return `${item.id !== 'name' ? '    ' : '' }        <${fieldTag}${item.isLocalized ? ` xml:lang="${escapeXmlAttribute(item.lang)}">` : '>'}${item.values[0]}</${fieldTag}>\n`;
         })
       );
 
@@ -165,16 +179,17 @@ namespace FerbToolsContentAssetExport {
         renderers.cleanup(items).map(async (item: ContentAssetItem): Promise<string> => {
           const effectiveValues: string[] = item.values.filter(isEffectiveValue);
           const value: string = formatCustomAttributeValues(effectiveValues);
+          const escapedId: string = escapeXmlAttribute(item.id);
 
           if (item.siteSpecificUrl) {
             const hasDefaultValue: boolean = effectiveValues.length > 0;
-            const defaultXml: string = hasDefaultValue ? `            <custom-attribute attribute-id="${item.id}">${value}</custom-attribute>\n` : '';
-            const siteSpecificText: string = await renderers.getDataBySite(item.siteSpecificUrl, `            <custom-attribute site-id="###" attribute-id="${item.id}">`, `</custom-attribute>`, formatCustomAttributeValues);
+            const defaultXml: string = hasDefaultValue ? `            <custom-attribute attribute-id="${escapedId}">${value}</custom-attribute>\n` : '';
+            const siteSpecificText: string = await renderers.getDataBySite(item.siteSpecificUrl, `            <custom-attribute site-id="###" attribute-id="${escapedId}">`, `</custom-attribute>`, formatCustomAttributeValues);
 
             return defaultXml + siteSpecificText;
           }
 
-          return effectiveValues.length > 0 ? `            <custom-attribute attribute-id="${item.id}${item.isLocalized ? `" xml:lang="${item.lang}">` : '">'}${value}</custom-attribute>\n` : '';
+          return effectiveValues.length > 0 ? `            <custom-attribute attribute-id="${escapedId}${item.isLocalized ? `" xml:lang="${escapeXmlAttribute(item.lang)}">` : '">'}${value}</custom-attribute>\n` : '';
         })
       );
 
@@ -186,8 +201,9 @@ namespace FerbToolsContentAssetExport {
         .map((item: Element): string => {
           const parentNode: ParentNode | null = item.parentNode;
           const checkCellInput: HTMLInputElement | undefined = parentNode?.childNodes[6]?.childNodes[0] as HTMLInputElement | undefined;
+          const folderId: string = escapeXmlAttribute((item.textContent ?? '').trim());
 
-          return `<${checkCellInput?.checked ? 'classification-link' : 'folder-link'} folder-id="${(item as HTMLElement).innerHTML.trim()}" />`;
+          return `<${checkCellInput?.checked ? 'classification-link' : 'folder-link'} folder-id="${folderId}" />`;
         })
         .join('');
     },
@@ -208,7 +224,11 @@ namespace FerbToolsContentAssetExport {
 
     extensionWindow[WINDOW_FLAG] = true;
 
-    chrome.runtime.onMessage.addListener((message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: ContentAssetExportResponse) => void): boolean | void => {
+    chrome.runtime.onMessage.addListener((message: unknown, sender: chrome.runtime.MessageSender, sendResponse: (response: ContentAssetExportResponse) => void): boolean | void => {
+      if (sender.id !== chrome.runtime.id) {
+        return;
+      }
+
       if (isContentAssetExportMessage(message)) {
         generateContentAsset(message.runId)
           .then((): void => {
@@ -249,16 +269,7 @@ namespace FerbToolsContentAssetExport {
     reportProgress(runId, 2, 'Preparing export');
     const result: ContentAssetResult = await buildContentAsset(runId);
     reportProgress(runId, 96, 'Preparing download');
-    const blob = new Blob([result.xml], { type: 'text/xml' });
-    const button = document.createElement('a');
-
-    button.textContent = 'Download';
-    window.URL = window.URL || window.webkitURL;
-    button.href = window.URL.createObjectURL(blob);
-    button.download = `${result.filename}.xml`;
-    button.dataset.loaded = 'true';
-    button.style.pointerEvents = 'initial';
-    button.click();
+    downloadXml(result.xml, result.filename);
     reportProgress(runId, 100, 'Download started');
     console.log('Content asset generated and download initiated.');
   }
@@ -272,19 +283,21 @@ namespace FerbToolsContentAssetExport {
 
     reportProgress(runId, 2, 'Reading list page');
     activeSettings = await readContentAssetSettings();
+    activeRequestLimiter = createTaskLimiter(Math.min(12, Math.max(DEFAULT_REQUEST_CONCURRENCY, concurrency * 3)));
+    activeSiteDocCache = new Map<string, Promise<Document>>();
+
     const listContext: BuildContext = createBuildContext(document, window.location.href);
-    const currentListForm: HTMLFormElement = getRequiredContentListForm(listContext.doc);
-    const listPageUrl: string = new URL(currentListForm.getAttribute('action') || listContext.url, listContext.url).toString();
+    const searchConfig: ContentListSearchConfig = createContentListSearchConfig(listContext.doc, listContext.url);
     let searchedItems = 0;
     let completedItems = 0;
     const itemLimiter: TaskLimiter = createTaskLimiter(concurrency);
     const fragmentTasks: Promise<ContentAssetFragment>[] = uniqueContentIds.map((contentId: string, index: number): Promise<ContentAssetFragment> => {
       return itemLimiter(async (): Promise<ContentAssetFragment> => {
         reportProgress(runId, getSearchProgress(searchedItems, uniqueContentIds.length), `Searching ${contentId}`);
-        const detailUrl: string = await findContentAssetDetailUrl(listPageUrl, contentId);
+        const detailUrl: string = await findContentAssetDetailUrl(searchConfig, contentId);
         searchedItems += 1;
         reportProgress(runId, getSearchProgress(searchedItems, uniqueContentIds.length), `Found ${searchedItems}/${uniqueContentIds.length}`);
-        const detailDoc: Document = await fetchHtmlDocument(detailUrl);
+        const detailDoc: Document = await activeRequestLimiter((): Promise<Document> => fetchHtmlDocument(detailUrl));
         const fragment: ContentAssetFragment = await buildContentAssetFragment(createBuildContext(detailDoc, detailUrl), undefined, index === 0);
 
         completedItems += 1;
@@ -297,15 +310,13 @@ namespace FerbToolsContentAssetExport {
 
     reportProgress(runId, 94, 'Rendering XML');
     let libraryOpen: string = fragments[0]?.libraryOpen ?? renderLibraryOpen({ shared: false });
-
     if (!hasLibraryId(libraryOpen)) {
-      const listLibraryOpen: string = renderLibraryOpen(await fetchLibraryInfo(listContext));
-
+      const listLibraryInfo: LibraryInfo = await activeRequestLimiter((): Promise<LibraryInfo> => fetchLibraryInfo(listContext));
+      const listLibraryOpen: string = renderLibraryOpen(listLibraryInfo);
       if (hasLibraryId(listLibraryOpen)) {
         libraryOpen = listLibraryOpen;
       }
     }
-
     const xml: string = renderLibraryXml(libraryOpen, fragments.map((fragment: ContentAssetFragment): string => fragment.contentXml).join('\n'));
     const exportFilename: string = normalizeExportFilename(filename) || (uniqueContentIds.length === 1 ? uniqueContentIds[0] : `content-assets-${formatTimestampForFilename(new Date())}`);
 
@@ -323,6 +334,8 @@ namespace FerbToolsContentAssetExport {
     }
 
     activeSettings = await readContentAssetSettings();
+    activeRequestLimiter = createTaskLimiter(DEFAULT_REQUEST_CONCURRENCY);
+    activeSiteDocCache = new Map<string, Promise<Document>>();
     const fragment: ContentAssetFragment = await buildContentAssetFragment(createBuildContext(document, window.location.href), runId);
 
     return {
@@ -335,23 +348,32 @@ namespace FerbToolsContentAssetExport {
     const localeSelect: HTMLSelectElement = requireElementFromDocument(context.doc, '[name="LocaleId"]', HTMLSelectElement);
     const contentUUID: HTMLInputElement = requireElementFromDocument(context.doc, '[name="ContentUUID"]', HTMLInputElement);
     const localeForm: HTMLFormElement = requireElementFromDocument(context.doc, 'form[name="localeForm"]', HTMLFormElement);
+    const currentLocaleId: string = localeSelect.value || getDocumentInputValue(context.doc, 'LocaleId');
     const localeOptions: HTMLOptionElement[] = Array.from(localeSelect.options)
       .filter((option: HTMLOptionElement): boolean => (activeSettings.allowedLocales.length ? activeSettings.allowedLocales.includes(option.value) : true))
       .sort((a: HTMLOptionElement, b: HTMLOptionElement): number => a.value.localeCompare(b.value));
     const localeFormAction: string = new URL(localeForm.getAttribute('action') || context.url, context.url).toString();
-    const baseQuery = `?&ContentUUID=${contentUUID.value}&switch=switch&LocaleId=`;
+    const baseQuery = `?&ContentUUID=${encodeURIComponent(contentUUID.value)}&switch=switch&LocaleId=`;
     let completedLocales = 0;
     const localeRequests: Promise<LocalePage>[] = localeOptions.map((option: HTMLOptionElement): Promise<LocalePage> => {
-      const url: string = `${localeFormAction || context.url}${baseQuery}${option.value}`;
-      return fetch(url, { credentials: 'include' })
-        .then((res: Response): Promise<string> => res.text())
-        .then((html: string): LocalePage => {
-          completedLocales += 1;
-          if (runId) {
-            reportProgress(runId, getLocaleFetchPercent(completedLocales, localeOptions.length), `Fetched locale ${completedLocales}/${localeOptions.length}`);
-          }
-          return { html, url };
-        });
+      const url: string = `${localeFormAction || context.url}${baseQuery}${encodeURIComponent(option.value)}`;
+      if (option.value === currentLocaleId) {
+        completedLocales += 1;
+        if (runId) {
+          reportProgress(runId, getLocaleFetchPercent(completedLocales, localeOptions.length), `Fetched locale ${completedLocales}/${localeOptions.length}`);
+        }
+        return Promise.resolve({ doc: context.doc, url });
+      }
+
+      return activeRequestLimiter(async (): Promise<LocalePage> => {
+        const res: Response = await fetch(url, { credentials: 'include' });
+        const html: string = await res.text();
+        completedLocales += 1;
+        if (runId) {
+          reportProgress(runId, getLocaleFetchPercent(completedLocales, localeOptions.length), `Fetched locale ${completedLocales}/${localeOptions.length}`);
+        }
+        return { html, url };
+      });
     });
     const localePages: LocalePage[] = await Promise.all(localeRequests);
     if (runId) {
@@ -361,8 +383,11 @@ namespace FerbToolsContentAssetExport {
     if (runId) {
       reportProgress(runId, 72, 'Fetching library data');
     }
-    const libraryInfoPromise: Promise<LibraryInfo> = includeLibraryInfo ? fetchLibraryInfo(context) : Promise.resolve({ shared: false });
-    const [libraryInfo, folderNodes]: [LibraryInfo, Element[]] = await Promise.all([libraryInfoPromise, fetchFolderLinks(context)]);
+    const libraryInfoPromise: Promise<LibraryInfo> = includeLibraryInfo
+      ? activeRequestLimiter((): Promise<LibraryInfo> => fetchLibraryInfo(context))
+      : Promise.resolve({ shared: false });
+    const folderLinksPromise: Promise<Element[]> = activeRequestLimiter((): Promise<Element[]> => fetchFolderLinks(context));
+    const [libraryInfo, folderNodes]: [LibraryInfo, Element[]] = await Promise.all([libraryInfoPromise, folderLinksPromise]);
     if (runId) {
       reportProgress(runId, 84, 'Rendering XML');
     }
@@ -373,7 +398,7 @@ namespace FerbToolsContentAssetExport {
 
     return {
       contentId,
-      contentXml: [`    <content content-id="${contentId}">\n`, groupedXml, '        <folder-links>\n', foldersXml !== '' ? `${foldersXml}\n` : '', '        </folder-links>\n', '    </content>\n'].join(''),
+      contentXml: [`    <content content-id="${escapeXmlAttribute(contentId)}">\n`, groupedXml, '        <folder-links>\n', foldersXml !== '' ? `${foldersXml}\n` : '', '        </folder-links>\n', '    </content>\n'].join(''),
       libraryOpen,
     };
   }
@@ -418,19 +443,47 @@ namespace FerbToolsContentAssetExport {
     };
   }
 
-  async function findContentAssetDetailUrl(listUrl: string, contentId: string): Promise<string> {
-    const listDoc: Document = await fetchHtmlDocument(listUrl);
+  function createContentListSearchConfig(listDoc: Document, listUrl: string): ContentListSearchConfig {
     const listForm: HTMLFormElement = getRequiredContentListForm(listDoc);
     const searchUrl: string = new URL(listForm.getAttribute('action') || listUrl, listUrl).toString();
-    const body: URLSearchParams = createContentAssetSearchBody(listForm, contentId);
-    const html: string = await fetch(searchUrl, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded',
-      },
-      body: body.toString(),
-    }).then((response: Response): Promise<string> => response.text());
+    const baseParams = new URLSearchParams();
+
+    Array.from(listForm.elements).forEach((element: Element): void => {
+      if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement) || !element.name || element.disabled) {
+        return;
+      }
+
+      if (element instanceof HTMLInputElement && ['checkbox', 'radio'].includes(element.type) && !element.checked) {
+        return;
+      }
+
+      baseParams.set(element.name, element.value);
+    });
+
+    baseParams.set('CurrentPageNumber', '0');
+
+    if (!baseParams.has('find')) {
+      baseParams.set('find', '');
+    }
+
+    return { searchUrl, baseParams };
+  }
+
+  async function findContentAssetDetailUrl(searchConfig: ContentListSearchConfig, contentId: string): Promise<string> {
+    const body = new URLSearchParams(searchConfig.baseParams);
+    body.set('SearchTerm', contentId);
+
+    const html: string = await activeRequestLimiter(async (): Promise<string> => {
+      const response: Response = await fetch(searchConfig.searchUrl, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        body: body.toString(),
+      });
+      return response.text();
+    });
 
     const doc: Document = new DOMParser().parseFromString(html, 'text/html');
     const table: HTMLTableElement | null = getContentListTable(doc);
@@ -448,32 +501,7 @@ namespace FerbToolsContentAssetExport {
       throw new Error(`Không tìm thấy content asset: ${contentId}`);
     }
 
-    return new URL(href, searchUrl).toString();
-  }
-
-  function createContentAssetSearchBody(form: HTMLFormElement, contentId: string): URLSearchParams {
-    const params = new URLSearchParams();
-
-    Array.from(form.elements).forEach((element: Element): void => {
-      if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement) || !element.name || element.disabled) {
-        return;
-      }
-
-      if (element instanceof HTMLInputElement && ['checkbox', 'radio'].includes(element.type) && !element.checked) {
-        return;
-      }
-
-      params.set(element.name, element.value);
-    });
-
-    params.set('SearchTerm', contentId);
-    params.set('CurrentPageNumber', '0');
-
-    if (!params.has('find')) {
-      params.set('find', '');
-    }
-
-    return params;
+    return new URL(href, searchConfig.searchUrl).toString();
   }
 
   function getContentListTable(doc: Document): HTMLTableElement | null {
@@ -598,14 +626,17 @@ namespace FerbToolsContentAssetExport {
   function downloadXml(xml: string, filename: string): void {
     const blob = new Blob([xml], { type: 'text/xml' });
     const button = document.createElement('a');
+    const objectUrl: string = URL.createObjectURL(blob);
 
     button.textContent = 'Download';
-    window.URL = window.URL || window.webkitURL;
-    button.href = window.URL.createObjectURL(blob);
+    button.href = objectUrl;
     button.download = `${filename}.xml`;
     button.dataset.loaded = 'true';
     button.style.pointerEvents = 'initial';
     button.click();
+    window.setTimeout((): void => {
+      URL.revokeObjectURL(objectUrl);
+    }, 1000);
   }
 
   function normalizeContentIds(contentIds: string[]): string[] {
@@ -709,7 +740,7 @@ namespace FerbToolsContentAssetExport {
   function buildGroupsFromLocalePages(localePages: LocalePage[]): ContentAssetGroups {
     const parser = new DOMParser();
     const grouped: ContentAssetGroups = localePages.reduce((acc: ContentAssetGroups, localePage: LocalePage): ContentAssetGroups => {
-      const doc: Document = parser.parseFromString(localePage.html, 'text/html');
+      const doc: Document = localePage.doc ?? parser.parseFromString(localePage.html ?? '', 'text/html');
       const tooltipNodes: NodeListOf<HTMLElement> = doc.querySelectorAll<HTMLElement>('[data-dw-tooltip]');
       const localeId: string = getDocumentInputValue(doc, 'LocaleId');
       const xmlLang: string = localeId === 'default' ? 'x-default' : localeId.replace('_', '-');
@@ -732,7 +763,7 @@ namespace FerbToolsContentAssetExport {
           id: parts[1],
           lang: xmlLang,
           isLocalized: isLocalized(node),
-          values: Array.from(doc.querySelectorAll<HTMLInputElement>(`[name=Meta${attrUuid}]`)).map((input: HTMLInputElement): string => escapeXmlValue(input.value)),
+          values: Array.from(doc.querySelectorAll<HTMLInputElement>(`[name="Meta${escapeCssValue(attrUuid)}"]`)).map((input: HTMLInputElement): string => escapeXmlValue(input.value)),
         };
         const siteSpecificUrl: string | null = getSiteSpecificUrl(node, localePage.url);
 
@@ -868,7 +899,7 @@ namespace FerbToolsContentAssetExport {
 
     return libraryType.indexOf('Shared') > -1
       ? {
-          xml: `<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31" library-id="${(rowChildren[0] as HTMLElement).innerText.trim()}">\n`,
+          xml: `<library xmlns="http://www.demandware.com/xml/impex/library/2006-10-31" library-id="${escapeXmlAttribute((rowChildren[0] as HTMLElement).innerText.trim())}">\n`,
           shared: true,
         }
       : { shared: false };
@@ -947,6 +978,18 @@ namespace FerbToolsContentAssetExport {
       .replace(/</gi, '&lt;')
       .replace(/\r\n|\r|\n/g, '&#13;\n')
       .replace(/>/gi, '&gt;');
+  }
+
+  function escapeXmlAttribute(value: string): string {
+    return escapeXmlValue(value)
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  function escapeCssValue(value: string): string {
+    return typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+      ? CSS.escape(value)
+      : value.replace(/["\\]/g, '\\$&');
   }
 
   function isEffectiveValue(value: string | undefined): value is string {

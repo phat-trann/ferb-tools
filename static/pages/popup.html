@@ -4,8 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>FerbTools Setup</title>
+    <script src="../shared/theme.js"></script>
     <style>
       :root {
+        color-scheme: light;
         --bg: #eef2f7;
         --surface: #ffffff;
         --surface-muted: #f8fafc;
@@ -19,15 +21,26 @@
         --primary-hover: #1d4ed8;
         --primary-soft: rgba(37, 99, 235, 0.12);
         --primary-border: rgba(37, 99, 235, 0.22);
-        --success: #0f766e;
+        --success: var(--primary);
         --danger: #dc2626;
         --danger-hover: #b91c1c;
-        --info: #075985;
-        --info-surface: #f0f9ff;
-        --info-border: rgba(14, 165, 233, 0.16);
+        --info: var(--primary-hover);
+        --info-surface: var(--surface-soft);
+        --info-border: var(--primary-border);
         --scroll-thumb: rgba(100, 116, 139, 0.34);
         --shadow-panel: 0 14px 32px rgba(15, 23, 42, 0.12);
         --shadow-button: 0 8px 16px rgba(37, 99, 235, 0.18);
+        --on-accent: #ffffff;
+        --field-bg: rgba(255, 255, 255, 0.88);
+        --link: var(--primary);
+        --overlay: rgba(15, 23, 42, 0.28);
+        --shadow-drawer: -16px 0 36px rgba(15, 23, 42, 0.18);
+        --switch-track: #94a3b8;
+        --switch-knob: #ffffff;
+        --focus-ring: rgba(37, 99, 235, 0.42);
+        --card-inset: rgba(255, 255, 255, 0.9);
+        --expand-bg: rgba(226, 232, 240, 0.86);
+        --kpi-track: #e2e8f0;
         --font-xs: 10px;
         --font-sm: 11px;
         --font-md: 12px;
@@ -35,6 +48,37 @@
         color: var(--text);
         background: var(--bg);
         font-family: "Noto Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      }
+
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0b1220;
+        --surface: #111c2e;
+        --surface-muted: #172338;
+        --surface-soft: #193352;
+        --border: rgba(148, 163, 184, 0.2);
+        --border-strong: rgba(148, 163, 184, 0.36);
+        --text: #e2e8f0;
+        --text-strong: #f1f5f9;
+        --text-muted: #a6b6cc;
+        --primary: #60a5fa;
+        --primary-hover: #93c5fd;
+        --primary-soft: rgba(96, 165, 250, 0.16);
+        --primary-border: rgba(96, 165, 250, 0.36);
+        --danger: #f87171;
+        --danger-hover: #fca5a5;
+        --scroll-thumb: rgba(148, 163, 184, 0.42);
+        --shadow-panel: 0 14px 32px rgba(0, 0, 0, 0.32);
+        --shadow-button: 0 6px 14px rgba(0, 0, 0, 0.2);
+        --on-accent: #0b1220;
+        --field-bg: #0d1728;
+        --overlay: rgba(0, 0, 0, 0.52);
+        --shadow-drawer: -16px 0 36px rgba(0, 0, 0, 0.38);
+        --switch-track: #475569;
+        --focus-ring: rgba(147, 197, 253, 0.65);
+        --card-inset: rgba(255, 255, 255, 0.04);
+        --expand-bg: #26364c;
+        --kpi-track: #2a3b52;
       }
 
       * {
@@ -163,7 +207,7 @@
         inset: 0;
         display: flex;
         justify-content: flex-end;
-        background: rgba(15, 23, 42, 0.28);
+        background: var(--overlay);
         backdrop-filter: blur(1px);
       }
 
@@ -179,7 +223,7 @@
         flex-direction: column;
         border-left: 1px solid var(--border-strong);
         background: var(--surface);
-        box-shadow: -16px 0 36px rgba(15, 23, 42, 0.18);
+        box-shadow: var(--shadow-drawer);
       }
 
       .settings-header {
@@ -274,7 +318,7 @@
         width: 44px;
         height: 26px;
         border-radius: 999px;
-        background: #94a3b8;
+        background: var(--switch-track);
         box-shadow: inset 0 2px 6px rgba(15, 23, 42, 0.18);
       }
 
@@ -290,7 +334,7 @@
         width: 18px;
         height: 18px;
         border-radius: 999px;
-        background: var(--surface);
+        background: var(--switch-knob);
         box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
       }
 
@@ -330,11 +374,18 @@
         border-radius: 8px;
         padding: 0 10px;
         color: var(--text);
-        background: rgba(255, 255, 255, 0.88);
+        background: var(--field-bg);
         font: inherit;
         font-size: var(--font-lg);
         font-weight: 700;
         outline: none;
+        accent-color: var(--primary);
+      }
+
+      input::placeholder,
+      textarea::placeholder {
+        color: var(--text-muted);
+        opacity: 0.85;
       }
 
       input:focus,
@@ -392,7 +443,7 @@
         height: 38px;
         border: none;
         border-radius: 8px;
-        color: var(--surface);
+        color: var(--on-accent);
         background: var(--primary);
         box-shadow: var(--shadow-button);
         font: inherit;
@@ -409,8 +460,9 @@
       summary:focus-visible,
       input:focus-visible,
       select:focus-visible,
-      textarea:focus-visible {
-        outline: 2px solid rgba(37, 99, 235, 0.42);
+      textarea:focus-visible,
+      .report-preview:focus-visible {
+        outline: 2px solid var(--focus-ring);
         outline-offset: 2px;
       }
 
@@ -449,7 +501,7 @@
 
       textarea::-webkit-scrollbar-thumb,
       .report-preview::-webkit-scrollbar-thumb {
-        border-color: rgba(255, 255, 255, 0.82);
+        border-color: var(--field-bg);
       }
 
       .tool-card {
@@ -464,7 +516,7 @@
       .tool-card[open] {
         border-color: var(--primary-border);
         background: var(--surface);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        box-shadow: inset 0 1px 0 var(--card-inset);
       }
 
       .tool-card:not([open]):hover {
@@ -502,7 +554,7 @@
         height: 28px;
         border-radius: 8px;
         color: var(--text-muted);
-        background: rgba(226, 232, 240, 0.86);
+        background: var(--expand-bg);
         font-size: 16px;
         font-weight: 900;
       }
@@ -523,7 +575,7 @@
         min-width: 70px;
         height: 32px;
         padding: 0 10px;
-        color: var(--surface);
+        color: var(--on-accent);
         background: var(--primary);
         box-shadow: var(--shadow-button);
       }
@@ -578,7 +630,7 @@
       }
 
       .danger-button {
-        color: var(--surface);
+        color: var(--on-accent);
         background: var(--danger);
         box-shadow: 0 8px 16px rgba(185, 28, 28, 0.18);
       }
@@ -639,7 +691,7 @@
       }
 
       .report-copy-button:hover:not(:disabled) {
-        color: var(--surface);
+        color: var(--on-accent);
         background: var(--primary);
       }
 
@@ -660,6 +712,10 @@
       .report-preview:empty::before {
         content: "No data";
         color: var(--text-muted);
+      }
+
+      .report-preview a {
+        color: var(--link) !important;
       }
 
       .worklog-preview {
@@ -692,12 +748,16 @@
         gap: 8px;
         padding: 8px;
         border-radius: 8px;
-        color: var(--surface);
+        color: var(--on-accent);
         background: var(--success);
       }
 
       .kpi-overall.is-fail {
         background: var(--danger);
+      }
+
+      .kpi-overall.is-na {
+        background: var(--text-muted);
       }
 
       .kpi-overall span {
@@ -743,6 +803,10 @@
         color: var(--danger);
       }
 
+      .kpi-metric.is-na .kpi-metric-heading span {
+        color: var(--text-muted);
+      }
+
       .kpi-metric-value,
       .kpi-target-label {
         color: var(--text-muted);
@@ -754,7 +818,7 @@
         height: 8px;
         overflow: visible;
         border-radius: 999px;
-        background: #e2e8f0;
+        background: var(--kpi-track);
       }
 
       .kpi-fill {
@@ -809,7 +873,7 @@
             </div>
           </div>
           <div class="top-actions">
-            <span id="version" class="version-pill">v1.20.0</span>
+            <span id="version" class="version-pill">v1.20.1</span>
             <button id="settings-open-button" class="icon-button" type="button" title="Settings" aria-label="Open settings" aria-controls="settings-drawer" aria-expanded="false">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <circle cx="12" cy="12" r="3"></circle>
@@ -826,6 +890,18 @@
               <button id="settings-close-button" class="icon-button" type="button" title="Close settings" aria-label="Close settings">×</button>
             </header>
             <div class="settings-scroll">
+              <section class="settings-group" aria-labelledby="appearance-settings-title">
+                <h3 id="appearance-settings-title">Giao diện</h3>
+                <label>
+                  Chế độ màu
+                  <select id="theme-preference">
+                    <option value="system">Theo hệ thống</option>
+                    <option value="light">Sáng</option>
+                    <option value="dark">Tối</option>
+                  </select>
+                </label>
+                <p id="theme-status" class="note" role="status">Tự động lưu khi thay đổi.</p>
+              </section>
               <section class="settings-group" aria-labelledby="visibility-settings-title">
                 <h3 id="visibility-settings-title">Visible functions</h3>
                 <div class="visibility-list">

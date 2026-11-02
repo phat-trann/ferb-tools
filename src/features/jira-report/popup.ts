@@ -1,10 +1,14 @@
 namespace FerbToolsJiraReportPopupFeature {
   const JIRA_REPORT_STORAGE_KEY = 'ferbToolsJiraReportLastReport';
   const JIRA_REPORT_SETTINGS_STORAGE_KEY = 'ferbToolsJiraReportSettings';
+  const JIRA_SHARED_SETTINGS_STORAGE_KEY = 'ferbToolsJiraSharedSettings';
+  const JIRA_WORKLOG_SETTINGS_STORAGE_KEY = 'ferbToolsJiraWorklogSettings';
+  const DEFAULT_SITE_URL = 'https://globee-software-ecommerce.atlassian.net';
   const DEFAULT_MY_TASKS_JQL = 'assignee = currentUser() AND statusCategory != Done ORDER BY duedate ASC';
   const LEGACY_TODAY_DONE_JQL = 'assignee = currentUser() AND statusCategory = Done AND status CHANGED TO Done AFTER startOfDay() ORDER BY updated DESC';
   const DEFAULT_TODAY_DONE_JQL = 'assignee = currentUser() AND statusCategory = Done ORDER BY updated DESC';
   const DEFAULT_SETTINGS: JiraReportSettings = {
+    siteUrl: DEFAULT_SITE_URL,
     role: 'DEV',
     myTasksJql: DEFAULT_MY_TASKS_JQL,
     todayDoneJql: DEFAULT_TODAY_DONE_JQL,
@@ -58,7 +62,7 @@ namespace FerbToolsJiraReportPopupFeature {
       void copyPreview(elements.copyResultButton, elements.resultPreview.innerHTML);
     });
 
-    [elements.roleInput, elements.myTasksJqlInput, elements.todayDoneJqlInput].forEach((input: HTMLInputElement | HTMLTextAreaElement): void => {
+    [elements.siteUrlInput, elements.roleInput, elements.myTasksJqlInput, elements.todayDoneJqlInput].forEach((input: HTMLInputElement | HTMLTextAreaElement): void => {
       input.addEventListener('change', (): void => {
         void saveSettings();
       });
@@ -105,14 +109,14 @@ namespace FerbToolsJiraReportPopupFeature {
         }
 
         lastReport = {
-          workHtml: mode === 'work' ? response.report.workHtml : lastReport.workHtml,
-          resultHtml: mode === 'result' ? response.report.resultHtml : lastReport.resultHtml,
+          workHtml: mode === 'work' ? sanitizeReportHtml(response.report.workHtml) : lastReport.workHtml,
+          resultHtml: mode === 'result' ? sanitizeReportHtml(response.report.resultHtml) : lastReport.resultHtml,
           warnings: response.report.warnings,
         };
         if (mode === 'work') {
-          elements.workPreview.innerHTML = response.report.workHtml;
+          elements.workPreview.innerHTML = lastReport.workHtml;
         } else {
-          elements.resultPreview.innerHTML = response.report.resultHtml;
+          elements.resultPreview.innerHTML = lastReport.resultHtml;
         }
         await writeLastReport(lastReport);
         const successMessage: string = mode === 'work' ? 'Đã generate Work Plan.' : `Đã generate Result ngày ${formatDateDisplay(elements.resultDateInput.value)}.`;
@@ -186,6 +190,7 @@ namespace FerbToolsJiraReportPopupFeature {
 
     function readSettingsFromForm(): JiraReportSettings {
       return {
+        siteUrl: normalizeSiteUrl(elements.siteUrlInput.value, DEFAULT_SETTINGS.siteUrl),
         role: normalizeRole(elements.roleInput.value, DEFAULT_SETTINGS.role),
         myTasksJql: normalizeJql(elements.myTasksJqlInput.value, DEFAULT_SETTINGS.myTasksJql),
         todayDoneJql: normalizeJql(elements.todayDoneJqlInput.value, DEFAULT_SETTINGS.todayDoneJql),
@@ -193,6 +198,7 @@ namespace FerbToolsJiraReportPopupFeature {
     }
 
     function renderSettings(settings: JiraReportSettings): void {
+      elements.siteUrlInput.value = settings.siteUrl;
       elements.roleInput.value = settings.role;
       elements.myTasksJqlInput.value = settings.myTasksJql;
       elements.todayDoneJqlInput.value = settings.todayDoneJql;
@@ -203,8 +209,12 @@ namespace FerbToolsJiraReportPopupFeature {
         const report: JiraReportResult | null = await readLastReport();
 
         if (report) {
-          lastReport = report;
-          renderReport(report);
+          lastReport = {
+            workHtml: sanitizeReportHtml(report.workHtml),
+            resultHtml: sanitizeReportHtml(report.resultHtml),
+            warnings: report.warnings,
+          };
+          renderReport(lastReport);
         }
       } catch (error: unknown) {
         console.error('Failed to load Jira report cache', error);
@@ -212,13 +222,80 @@ namespace FerbToolsJiraReportPopupFeature {
     }
 
     function renderReport(report: JiraReportResult): void {
-      elements.workPreview.innerHTML = report.workHtml;
-      elements.resultPreview.innerHTML = report.resultHtml;
+      elements.workPreview.innerHTML = sanitizeReportHtml(report.workHtml);
+      elements.resultPreview.innerHTML = sanitizeReportHtml(report.resultHtml);
     }
   }
 
+  function sanitizeReportHtml(rawHtml: string): string {
+    if (!rawHtml.trim()) {
+      return '';
+    }
+
+    const doc: Document = new DOMParser().parseFromString(rawHtml, 'text/html');
+    const allowedTags = new Set(['UL', 'OL', 'LI', 'STRONG', 'B', 'EM', 'I', 'BR', 'P', 'DIV', 'SPAN', 'A']);
+
+    function sanitizeNode(node: Node): Node | null {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return document.createTextNode(node.textContent ?? '');
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        return null;
+      }
+
+      const element = node as HTMLElement;
+      const tagName: string = element.tagName.toUpperCase();
+
+      if (!allowedTags.has(tagName)) {
+        const fragment: DocumentFragment = document.createDocumentFragment();
+        Array.from(element.childNodes).forEach((child: Node): void => {
+          const cleanChild: Node | null = sanitizeNode(child);
+          if (cleanChild) {
+            fragment.appendChild(cleanChild);
+          }
+        });
+        return fragment;
+      }
+
+      const cleanElement: HTMLElement = document.createElement(tagName.toLowerCase());
+      if (tagName === 'A') {
+        const href: string = element.getAttribute('href') ?? '';
+        try {
+          const parsedUrl = new URL(href);
+          if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+            cleanElement.setAttribute('href', parsedUrl.toString());
+            cleanElement.setAttribute('target', '_blank');
+            cleanElement.setAttribute('rel', 'noreferrer noopener');
+            cleanElement.setAttribute('style', 'text-decoration:none; color:#0052cc;');
+          }
+        } catch {}
+      }
+
+      Array.from(element.childNodes).forEach((child: Node): void => {
+        const cleanChild: Node | null = sanitizeNode(child);
+        if (cleanChild) {
+          cleanElement.appendChild(cleanChild);
+        }
+      });
+
+      return cleanElement;
+    }
+
+    const container: HTMLDivElement = document.createElement('div');
+    Array.from(doc.body.childNodes).forEach((child: Node): void => {
+      const cleanChild: Node | null = sanitizeNode(child);
+      if (cleanChild) {
+        container.appendChild(cleanChild);
+      }
+    });
+
+    return container.innerHTML;
+  }
+
   async function copyHtmlToClipboard(html: string): Promise<void> {
-    const plainText: string = html
+    const safeHtml: string = sanitizeReportHtml(html);
+    const plainText: string = safeHtml
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/li>/gi, '\n')
       .replace(/<[^>]+>/g, '')
@@ -232,7 +309,7 @@ namespace FerbToolsJiraReportPopupFeature {
 
     await navigator.clipboard.write([
       new ClipboardItem({
-        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/html': new Blob([safeHtml], { type: 'text/html' }),
         'text/plain': new Blob([plainText], { type: 'text/plain' }),
       }),
     ]);
@@ -325,13 +402,17 @@ namespace FerbToolsJiraReportPopupFeature {
 
   async function readSettings(): Promise<JiraReportSettings> {
     return new Promise((resolve: (value: JiraReportSettings) => void): void => {
-      chrome.storage.local.get(JIRA_REPORT_SETTINGS_STORAGE_KEY, (items: Record<string, unknown>): void => {
+      chrome.storage.local.get([JIRA_REPORT_SETTINGS_STORAGE_KEY, JIRA_SHARED_SETTINGS_STORAGE_KEY, JIRA_WORKLOG_SETTINGS_STORAGE_KEY], (items: Record<string, unknown>): void => {
         if (chrome.runtime.lastError) {
           resolve({ ...DEFAULT_SETTINGS });
           return;
         }
 
-        resolve(normalizeSettings(items[JIRA_REPORT_SETTINGS_STORAGE_KEY]));
+        resolve(normalizeSettings(
+          items[JIRA_REPORT_SETTINGS_STORAGE_KEY],
+          items[JIRA_SHARED_SETTINGS_STORAGE_KEY],
+          items[JIRA_WORKLOG_SETTINGS_STORAGE_KEY]
+        ));
       });
     });
   }
@@ -341,6 +422,10 @@ namespace FerbToolsJiraReportPopupFeature {
       chrome.storage.local.set(
         {
           [JIRA_REPORT_SETTINGS_STORAGE_KEY]: settings,
+          [JIRA_SHARED_SETTINGS_STORAGE_KEY]: {
+            siteUrl: settings.siteUrl,
+            role: settings.role,
+          },
         },
         (): void => {
           if (chrome.runtime.lastError) {
@@ -354,20 +439,40 @@ namespace FerbToolsJiraReportPopupFeature {
     });
   }
 
-  function normalizeSettings(candidate: unknown): JiraReportSettings {
-    if (!isRecord(candidate)) {
-      return { ...DEFAULT_SETTINGS };
-    }
+  function normalizeSettings(candidate: unknown, sharedCandidate?: unknown, worklogCandidate?: unknown): JiraReportSettings {
+    const reportSettings: Record<string, unknown> = isRecord(candidate) ? candidate : {};
+    const sharedSettings: Record<string, unknown> = isRecord(sharedCandidate) ? sharedCandidate : {};
+    const worklogSettings: Record<string, unknown> = isRecord(worklogCandidate) ? worklogCandidate : {};
 
     return {
-      role: normalizeRole(candidate.role ?? extractLegacyRole(candidate.owner ?? candidate.workPlanOwner ?? candidate.resultOwner), DEFAULT_SETTINGS.role),
-      myTasksJql: normalizeJql(candidate.myTasksJql, DEFAULT_SETTINGS.myTasksJql),
-      todayDoneJql: normalizeResultJql(candidate.todayDoneJql),
+      siteUrl: normalizeSiteUrl(sharedSettings.siteUrl ?? worklogSettings.siteUrl ?? reportSettings.siteUrl, DEFAULT_SETTINGS.siteUrl),
+      role: normalizeRole(
+        sharedSettings.role ?? worklogSettings.role ?? reportSettings.role ?? extractLegacyRole(reportSettings.owner ?? reportSettings.workPlanOwner ?? reportSettings.resultOwner),
+        DEFAULT_SETTINGS.role
+      ),
+      myTasksJql: normalizeJql(reportSettings.myTasksJql, DEFAULT_SETTINGS.myTasksJql),
+      todayDoneJql: normalizeResultJql(reportSettings.todayDoneJql),
     };
   }
 
+  function normalizeSiteUrl(candidate: unknown, fallback: string): string {
+    if (typeof candidate !== 'string') {
+      return fallback;
+    }
+    try {
+      const url = new URL(candidate.trim());
+      return url.protocol === 'http:' || url.protocol === 'https:' ? url.origin : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
   function normalizeRole(candidate: unknown, fallback: string): string {
-    return typeof candidate === 'string' && candidate.trim() ? candidate.trim() : fallback;
+    if (typeof candidate !== 'string') {
+      return fallback;
+    }
+    const normalized: string = candidate.trim().replace(/^\[|\]$/g, '').toUpperCase();
+    return normalized || fallback;
   }
 
   function normalizeJql(candidate: unknown, fallback: string): string {

@@ -1,6 +1,8 @@
 namespace FerbToolsJiraWorklogPopupFeature {
   const SETTINGS_STORAGE_KEY = 'ferbToolsJiraWorklogSettings';
-  const RESULT_STORAGE_KEY = 'ferbToolsJiraKpiLastResult';
+  const JIRA_SHARED_SETTINGS_STORAGE_KEY = 'ferbToolsJiraSharedSettings';
+  const JIRA_REPORT_SETTINGS_STORAGE_KEY = 'ferbToolsJiraReportSettings';
+  const RESULT_STORAGE_KEY = 'ferbToolsJiraKpiLastResultV2';
   const PRODUCTION_STORAGE_KEY = 'ferbToolsJiraKpiProductionIssueByMonth';
   const DEFAULT_SITE_URL = 'https://globee-software-ecommerce.atlassian.net';
   const DEFAULT_ATTENDANCE_URL = 'https://globee.1office.vn/user?customMenu=user-board-attendance';
@@ -20,7 +22,7 @@ namespace FerbToolsJiraWorklogPopupFeature {
     actual: number;
     targetValue: number;
     maximum: number;
-    pass: boolean;
+    pass: boolean | null;
   }
 
   export interface Elements {
@@ -98,7 +100,7 @@ namespace FerbToolsJiraWorklogPopupFeature {
 
         const [jiraResponse, attendanceResponse]: [JiraWorklogResponse, AttendanceResponse] = await Promise.all([
           sendTabMessage<JiraWorklogStartMessage, JiraWorklogResponse>(jiraTab.id, 'features/jira-worklog/content.js', {
-            type: 'RUN_JIRA_WORKLOG_SYNC_V2',
+            type: 'RUN_JIRA_WORKLOG_SYNC_V3',
             settings,
             cutoffDate,
           }),
@@ -202,13 +204,14 @@ namespace FerbToolsJiraWorklogPopupFeature {
       elements.attendanceUrlInput.value = settings.attendanceUrl;
       elements.monthInput.value = settings.month;
       elements.concurrencyInput.value = String(settings.concurrency);
+      elements.roleInput.value = settings.role;
     }
 
     function renderSnapshot(snapshot: KpiSnapshot, settings: JiraWorklogSettings): void {
       const { jira, attendance } = snapshot;
       const expectedSeconds: number = attendance.attendanceDays * 8 * 60 * 60;
       const workingPercent: number = expectedSeconds > 0 ? (jira.totalSeconds / expectedSeconds) * 100 : 0;
-      const deadlinePercent: number = jira.completedWithDueDate > 0 ? (jira.completedOnTime / jira.completedWithDueDate) * 100 : 100;
+      const deadlinePercent: number = jira.completedWithDueDate > 0 ? (jira.completedOnTime / jira.completedWithDueDate) * 100 : 0;
       const bugPercent: number = jira.totalSeconds > 0 ? (jira.bugFixSeconds / jira.totalSeconds) * 100 : 0;
       const hasProductionIssue: boolean = elements.productionIssueInput.checked;
       const metrics: MetricView[] = [
@@ -223,12 +226,12 @@ namespace FerbToolsJiraWorklogPopupFeature {
         },
         {
           label: 'On Deadline',
-          value: jira.completedWithDueDate > 0 ? `${formatPercent(deadlinePercent)} · ${jira.completedOnTime}/${jira.completedWithDueDate} task` : 'N/A · 0 task có due date',
+          value: jira.completedWithDueDate > 0 ? `${formatPercent(deadlinePercent)} · ${jira.completedOnTime}/${jira.completedWithDueDate} task` : 'N/A · Không có task đủ Completed Date và Due date',
           target: `≥ ${ON_DEADLINE_TARGET_PERCENT}%`,
           actual: deadlinePercent,
           targetValue: ON_DEADLINE_TARGET_PERCENT,
           maximum: 100,
-          pass: jira.completedWithDueDate === 0 || deadlinePercent >= ON_DEADLINE_TARGET_PERCENT,
+          pass: jira.completedWithDueDate > 0 ? deadlinePercent >= ON_DEADLINE_TARGET_PERCENT : null,
         },
         {
           label: `Bug fix [BUG-${settings.role}]`,
@@ -258,10 +261,13 @@ namespace FerbToolsJiraWorklogPopupFeature {
           pass: jira.ncCount <= 1,
         },
       ];
-      const overallPass: boolean = metrics.every((metric: MetricView): boolean => metric.pass);
-      elements.summaryElement.textContent = `${jira.displayName} · ${jira.month} · ${overallPass ? 'PASS' : 'FAIL'}`;
+      const overallStatus: string = metrics.some((metric: MetricView): boolean => metric.pass === false)
+        ? 'FAIL'
+        : metrics.some((metric: MetricView): boolean => metric.pass === null) ? 'N/A' : 'PASS';
+      const overallClass: string = overallStatus === 'N/A' ? 'is-na' : overallStatus === 'PASS' ? 'is-pass' : 'is-fail';
+      elements.summaryElement.textContent = `${jira.displayName} · ${jira.month} · ${overallStatus}`;
 
-      let html = `<div class="kpi-overall ${overallPass ? 'is-pass' : 'is-fail'}"><span>${escapeHtml(jira.displayName)}</span><strong>${overallPass ? 'PASS' : 'FAIL'}</strong></div>`;
+      let html = `<div class="kpi-overall ${overallClass}"><span>${escapeHtml(jira.displayName)}</span><strong>${overallStatus}</strong></div>`;
       html += `<p class="kpi-cutoff">Tính đến ${escapeHtml(jira.cutoffDate)} · ${escapeHtml(formatAttendanceDays(attendance.attendanceDays))} công thực tế</p>`;
       html += '<div class="kpi-list">';
       metrics.forEach((metric: MetricView): void => {
@@ -279,11 +285,13 @@ namespace FerbToolsJiraWorklogPopupFeature {
   }
 
   function renderMetric(metric: MetricView): string {
+    const status: string = metric.pass === null ? 'N/A' : metric.pass ? 'PASS' : 'FAIL';
+    const statusClass: string = metric.pass === null ? 'is-na' : metric.pass ? 'is-pass' : 'is-fail';
     const maximum: number = Math.max(metric.maximum, 1);
     const fillPercent: number = Math.min(100, Math.max(0, (metric.actual / maximum) * 100));
     const markerPercent: number = Math.min(99, Math.max(1, (metric.targetValue / maximum) * 100));
-    return `<div class="kpi-metric ${metric.pass ? 'is-pass' : 'is-fail'}">
-      <div class="kpi-metric-heading"><strong>${escapeHtml(metric.label)}</strong><span>${metric.pass ? 'PASS' : 'FAIL'}</span></div>
+    return `<div class="kpi-metric ${statusClass}">
+      <div class="kpi-metric-heading"><strong>${escapeHtml(metric.label)}</strong><span>${status}</span></div>
       <div class="kpi-metric-value">${escapeHtml(metric.value)}</div>
       <div class="kpi-track" title="Target: ${escapeAttribute(metric.target)}">
         <span class="kpi-fill" style="width:${fillPercent.toFixed(2)}%"></span>
@@ -342,12 +350,36 @@ namespace FerbToolsJiraWorklogPopupFeature {
   }
 
   async function readSettings(): Promise<JiraWorklogSettings> {
-    const value: unknown = await readStorage(SETTINGS_STORAGE_KEY);
-    return normalizeSettings(value);
+    const [value, sharedValue, reportValue]: [unknown, unknown, unknown] = await Promise.all([
+      readStorage(SETTINGS_STORAGE_KEY),
+      readStorage(JIRA_SHARED_SETTINGS_STORAGE_KEY),
+      readStorage(JIRA_REPORT_SETTINGS_STORAGE_KEY),
+    ]);
+    const settings: JiraWorklogSettings = normalizeSettings(value);
+    if (isRecord(sharedValue)) {
+      return {
+        ...settings,
+        siteUrl: normalizeUrl(sharedValue.siteUrl, settings.siteUrl, true),
+        role: normalizeRole(sharedValue.role, settings.role),
+      };
+    }
+    const storedWorklogSettings: Record<string, unknown> = isRecord(value) ? value : {};
+    const storedReportSettings: Record<string, unknown> = isRecord(reportValue) ? reportValue : {};
+    return {
+      ...settings,
+      siteUrl: normalizeUrl(storedWorklogSettings.siteUrl ?? storedReportSettings.siteUrl, settings.siteUrl, true),
+      role: normalizeRole(storedWorklogSettings.role ?? storedReportSettings.role, settings.role),
+    };
   }
 
   function writeSettings(settings: JiraWorklogSettings): Promise<void> {
-    return writeStorage(SETTINGS_STORAGE_KEY, settings);
+    return Promise.all([
+      writeStorage(SETTINGS_STORAGE_KEY, settings),
+      writeStorage(JIRA_SHARED_SETTINGS_STORAGE_KEY, {
+        siteUrl: settings.siteUrl,
+        role: settings.role,
+      }),
+    ]).then((): void => undefined);
   }
 
   async function readLastSnapshot(): Promise<KpiSnapshot | null> {

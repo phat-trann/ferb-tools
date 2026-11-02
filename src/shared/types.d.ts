@@ -111,6 +111,7 @@ interface JiraReportGenerateMessage {
 }
 
 interface JiraReportSettings {
+  siteUrl: string;
   role: string;
   myTasksJql: string;
   todayDoneJql: string;
@@ -131,7 +132,7 @@ interface JiraWorklogSettings {
 }
 
 interface JiraWorklogStartMessage {
-  type: "RUN_JIRA_WORKLOG_SYNC_V2";
+  type: "RUN_JIRA_WORKLOG_SYNC_V3";
   settings: JiraWorklogSettings;
   cutoffDate: string;
 }

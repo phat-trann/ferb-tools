@@ -23,7 +23,7 @@ namespace FerbToolsBackground {
   const BADGE_DISABLED_COLOR = '#64748b';
   const BADGE_PENDING_COLOR = '#dc2626';
   const BADGE_COUNTDOWN_COLOR = '#f59e0b';
-  const BADGE_READY_COLOR = '#16a34a';
+  const BADGE_READY_COLOR = '#2563eb';
 
   interface NoticeBadgeState {
     text: string;
@@ -35,25 +35,23 @@ namespace FerbToolsBackground {
 
   chrome.runtime.onInstalled.addListener((): void => {
     void queueTask(async (): Promise<void> => {
-      await initializeState();
-      ensureBadgeRefreshAlarm();
-      await refreshActionBadge();
+      const state: FerbToolsStorageState = await initializeState();
+      await refreshActionBadge(state);
     });
   });
 
   chrome.runtime.onStartup.addListener((): void => {
     void queueTask(async (): Promise<void> => {
-      await initializeState();
-      ensureBadgeRefreshAlarm();
-      await handleCurrentActiveTab();
-      await refreshActionBadge();
+      const state: FerbToolsStorageState = await initializeState();
+      const nextState: FerbToolsStorageState = await handleCurrentActiveTab(state);
+      await refreshActionBadge(nextState);
     });
   });
 
   chrome.tabs.onActivated.addListener((activeInfo: chrome.tabs.OnActivatedInfo): void => {
     void queueTask(async (): Promise<void> => {
-      await handleTabActivation(activeInfo.tabId);
-      await refreshActionBadge();
+      const state: FerbToolsStorageState = await handleTabActivation(activeInfo.tabId);
+      await refreshActionBadge(state);
     });
   });
 
@@ -63,8 +61,8 @@ namespace FerbToolsBackground {
     }
 
     void queueTask(async (): Promise<void> => {
-      await handleTabActivation(tabId);
-      await refreshActionBadge();
+      const state: FerbToolsStorageState = await handleTabActivation(tabId);
+      await refreshActionBadge(state);
     });
   });
 
@@ -80,8 +78,8 @@ namespace FerbToolsBackground {
     }
 
     void queueTask(async (): Promise<void> => {
-      await handleCurrentActiveTab();
-      await refreshActionBadge();
+      const state: FerbToolsStorageState = await handleCurrentActiveTab();
+      await refreshActionBadge(state);
     });
   });
 
@@ -92,7 +90,16 @@ namespace FerbToolsBackground {
   });
 
   chrome.runtime.onMessage.addListener((message: unknown, sender: chrome.runtime.MessageSender, sendResponse: (response?: NoticeCompleteCheckInResponse | NoticeAcknowledgeCheckoutReminderResponse | NoticeSettingsResponse | NoticeUpdateTodayCheckInResponse | NoticeClearTodayDataResponse | NoticeSnoozeDailyCheckInPromptResponse) => void): boolean | void => {
+    if (!isExtensionSender(sender)) {
+      return;
+    }
+
     if (isCompleteCheckInMessage(message)) {
+      if (!isContentScriptSender(sender)) {
+        sendResponse({ success: false, error: 'Unauthorized sender.' });
+        return;
+      }
+
       void queueTask(async (): Promise<NoticeCompleteCheckInResponse> => {
         return completeCheckIn(message.checkInTime);
       }).then(
@@ -112,6 +119,14 @@ namespace FerbToolsBackground {
     }
 
     if (isGetSettingsMessage(message)) {
+      if (!isPopupSender(sender)) {
+        sendResponse({
+          success: false,
+          error: 'Unauthorized sender.',
+        });
+        return;
+      }
+
       void queueTask(async (): Promise<NoticeSettingsResponse> => {
         const state: FerbToolsStorageState = await initializeState();
 
@@ -137,6 +152,14 @@ namespace FerbToolsBackground {
     }
 
     if (isUpdateSettingsMessage(message)) {
+      if (!isPopupSender(sender)) {
+        sendResponse({
+          success: false,
+          error: 'Unauthorized sender.',
+        });
+        return;
+      }
+
       void queueTask(async (): Promise<NoticeSettingsResponse> => {
         return updateSettings(message.settings);
       }).then(
@@ -156,6 +179,14 @@ namespace FerbToolsBackground {
     }
 
     if (isUpdateTodayCheckInMessage(message)) {
+      if (!isPopupSender(sender)) {
+        sendResponse({
+          success: false,
+          error: 'Unauthorized sender.',
+        });
+        return;
+      }
+
       void queueTask(async (): Promise<NoticeUpdateTodayCheckInResponse> => {
         return updateTodayCheckIn(message.checkInTime);
       }).then(
@@ -175,6 +206,14 @@ namespace FerbToolsBackground {
     }
 
     if (isClearTodayDataMessage(message)) {
+      if (!isPopupSender(sender)) {
+        sendResponse({
+          success: false,
+          error: 'Unauthorized sender.',
+        });
+        return;
+      }
+
       void queueTask(async (): Promise<NoticeClearTodayDataResponse> => {
         return clearTodayData();
       }).then(
@@ -194,6 +233,11 @@ namespace FerbToolsBackground {
     }
 
     if (isSnoozeDailyCheckInPromptMessage(message)) {
+      if (!isContentScriptSender(sender)) {
+        sendResponse({ success: false, error: 'Unauthorized sender.' });
+        return;
+      }
+
       void queueTask(async (): Promise<NoticeSnoozeDailyCheckInPromptResponse> => {
         return snoozeDailyCheckInPrompt(sender);
       }).then(
@@ -213,6 +257,11 @@ namespace FerbToolsBackground {
     }
 
     if (isAcknowledgeCheckoutReminderMessage(message)) {
+      if (!isContentScriptSender(sender)) {
+        sendResponse({ success: false, error: 'Unauthorized sender.' });
+        return;
+      }
+
       void queueTask(async (): Promise<NoticeAcknowledgeCheckoutReminderResponse> => {
         await acknowledgeCheckoutReminder(message.dayKey);
 
@@ -258,28 +307,29 @@ namespace FerbToolsBackground {
     return prunedState.state;
   }
 
-  async function handleCurrentActiveTab(): Promise<void> {
+  async function handleCurrentActiveTab(existingState?: FerbToolsStorageState): Promise<FerbToolsStorageState> {
     const activeTab: chrome.tabs.Tab | null = await getCurrentActiveTab();
 
     if (!activeTab || typeof activeTab.id !== 'number') {
-      return;
+      return existingState ?? initializeState();
     }
 
-    await handleTabActivation(activeTab.id);
+    return handleTabActivation(activeTab.id, existingState);
   }
 
-  async function handleTabActivation(tabId: number): Promise<void> {
-    const tab: chrome.tabs.Tab | null = await getTab(tabId);
+  async function handleTabActivation(tabId: number, existingState?: FerbToolsStorageState): Promise<FerbToolsStorageState> {
+    const [tab, state]: [chrome.tabs.Tab | null, FerbToolsStorageState] = await Promise.all([
+      getTab(tabId),
+      existingState ? Promise.resolve(existingState) : initializeState(),
+    ]);
 
     if (!tab || typeof tab.id !== 'number' || !isInjectableUrl(tab.url)) {
-      return;
+      return state;
     }
-
-    const state: FerbToolsStorageState = await initializeState();
 
     if (!state.features.checkIn.settings.enabled) {
       await dismissCheckInNotice(tab.id);
-      return;
+      return state;
     }
 
     const now: number = Date.now();
@@ -295,42 +345,46 @@ namespace FerbToolsBackground {
         await saveStorageState(state);
       }
 
-      return;
+      return state;
     }
 
     const activeWorkRecord: NoticeDailyRecord | null = getActiveWorkRecord(state, now, dayKey);
 
     if (activeWorkRecord) {
-      return;
+      return state;
     }
 
     const todayRecord: NoticeDailyRecord | undefined = state.features.checkIn.records[dayKey];
 
     if (todayRecord?.checkInAt) {
-      return;
+      return state;
     }
 
     if (!shouldShowDailyCheckInPrompt(now, state.features.checkIn.settings)) {
       await dismissCheckInNotice(tab.id);
-      return;
+      return state;
     }
 
     if (await isCheckInPromptSnoozed(tab.id, now)) {
-      return;
+      return state;
     }
 
     const promptShown: boolean = await showDailyCheckInPrompt(tab.id, dayKey, state.features.checkIn.settings);
 
     if (!promptShown) {
-      return;
+      return state;
     }
 
-    state.features.checkIn.records[dayKey] = {
-      dayKey,
-      promptShownAt: now,
-    };
+    if (!todayRecord?.promptShownAt) {
+      state.features.checkIn.records[dayKey] = {
+        ...todayRecord,
+        dayKey,
+        promptShownAt: now,
+      };
+      await saveStorageState(state);
+    }
 
-    await saveStorageState(state);
+    return state;
   }
 
   async function handleAlarm(alarm: chrome.alarms.Alarm): Promise<void> {
@@ -346,44 +400,43 @@ namespace FerbToolsBackground {
     }
 
     const now: number = Date.now();
+    const state: FerbToolsStorageState = await initializeState();
 
     if (dayKey !== getDayKey(now) || isWeekend(now)) {
-      await refreshActionBadge();
+      await refreshActionBadge(state);
       return;
     }
 
-    const state: FerbToolsStorageState = await initializeState();
-
     if (!state.features.checkIn.settings.enabled) {
-      await refreshActionBadge();
+      await refreshActionBadge(state);
       return;
     }
 
     const record: NoticeDailyRecord | undefined = state.features.checkIn.records[dayKey];
 
     if (!record || !record.checkInAt || !record.checkoutReminderDueAt || record.checkoutReminderShownAt) {
-      await refreshActionBadge();
+      await refreshActionBadge(state);
       return;
     }
 
     const activeTab: chrome.tabs.Tab | null = await getCurrentActiveTab();
 
     if (!activeTab || typeof activeTab.id !== 'number' || !isInjectableUrl(activeTab.url)) {
-      await refreshActionBadge();
+      await refreshActionBadge(state);
       return;
     }
 
     const reminderShown: boolean = await showCheckoutReminder(activeTab.id, record, state.features.checkIn.settings);
 
     if (!reminderShown) {
-      await refreshActionBadge();
+      await refreshActionBadge(state);
       return;
     }
 
     record.checkoutReminderShownAt = now;
     state.features.checkIn.records[dayKey] = record;
     await saveStorageState(state);
-    await refreshActionBadge();
+    await refreshActionBadge(state);
   }
 
   async function completeCheckIn(checkInTime?: string): Promise<NoticeCompleteCheckInResponse> {
@@ -421,8 +474,7 @@ namespace FerbToolsBackground {
       });
     }
 
-    ensureBadgeRefreshAlarm();
-    await refreshActionBadge();
+    await refreshActionBadge(state);
 
     return {
       success: true,
@@ -442,7 +494,7 @@ namespace FerbToolsBackground {
       await saveStorageState(state);
     }
 
-    await refreshActionBadge();
+    await refreshActionBadge(state);
   }
 
   async function updateSettings(settingsPatch: Partial<NoticeSettings>): Promise<NoticeSettingsResponse> {
@@ -454,7 +506,7 @@ namespace FerbToolsBackground {
 
     state.features.checkIn.settings = nextSettings;
     await saveStorageState(state);
-    await refreshActionBadge();
+    await refreshActionBadge(state);
 
     return {
       success: true,
@@ -501,8 +553,7 @@ namespace FerbToolsBackground {
       });
     }
 
-    ensureBadgeRefreshAlarm();
-    await refreshActionBadge();
+    await refreshActionBadge(state);
 
     return {
       success: true,
@@ -519,7 +570,7 @@ namespace FerbToolsBackground {
 
     await saveStorageState(state);
     await clearAlarm(getAlarmName(dayKey));
-    await refreshActionBadge();
+    await refreshActionBadge(state);
 
     return {
       success: true,
@@ -617,11 +668,18 @@ namespace FerbToolsBackground {
     };
   }
 
-  async function refreshActionBadge(): Promise<void> {
-    const state: FerbToolsStorageState = await initializeState();
-    const badgeState: NoticeBadgeState = getBadgeState(state, Date.now());
+  async function refreshActionBadge(existingState?: FerbToolsStorageState): Promise<void> {
+    const state: FerbToolsStorageState = existingState ?? await initializeState();
+    const now: number = Date.now();
+    const badgeState: NoticeBadgeState = getBadgeState(state, now);
 
-    await Promise.all([chrome.action.setBadgeText({ text: badgeState.text }), chrome.action.setBadgeBackgroundColor({ color: badgeState.backgroundColor }), chrome.action.setBadgeTextColor({ color: BADGE_TEXT_COLOR }), chrome.action.setTitle({ title: badgeState.title })]);
+    await Promise.all([
+      chrome.action.setBadgeText({ text: badgeState.text }),
+      chrome.action.setBadgeBackgroundColor({ color: badgeState.backgroundColor }),
+      chrome.action.setBadgeTextColor({ color: BADGE_TEXT_COLOR }),
+      chrome.action.setTitle({ title: badgeState.title }),
+      syncBadgeRefreshAlarm(state, now),
+    ]);
   }
 
   function getBadgeState(state: FerbToolsStorageState, now: number): NoticeBadgeState {
@@ -891,10 +949,42 @@ namespace FerbToolsBackground {
     return `${hours}:${minutes}`;
   }
 
-  function ensureBadgeRefreshAlarm(): void {
+  async function syncBadgeRefreshAlarm(state: FerbToolsStorageState, now: number): Promise<void> {
+    if (!state.features.checkIn.settings.enabled) {
+      await clearAlarm(BADGE_REFRESH_ALARM);
+      return;
+    }
+
+    const activeWorkRecord: NoticeDailyRecord | null = getActiveWorkRecord(state, now);
+
+    if (activeWorkRecord?.checkInAt && activeWorkRecord.checkoutReminderDueAt) {
+      chrome.alarms.create(BADGE_REFRESH_ALARM, {
+        periodInMinutes: BADGE_REFRESH_PERIOD_MINUTES,
+      });
+      return;
+    }
+
+    await clearAlarm(BADGE_REFRESH_ALARM);
+
+    const todayRecord: NoticeDailyRecord | undefined = state.features.checkIn.records[getDayKey(now)];
+    const latestCheckInTimestamp: number = getLocalTimeTimestamp(now, state.features.checkIn.settings.latestCheckInTime);
+
+    if (!todayRecord?.checkInAt && !isWeekend(now) && now <= latestCheckInTimestamp) {
+      chrome.alarms.create(BADGE_REFRESH_ALARM, {
+        when: latestCheckInTimestamp + 1000,
+      });
+      return;
+    }
+
     chrome.alarms.create(BADGE_REFRESH_ALARM, {
-      periodInMinutes: BADGE_REFRESH_PERIOD_MINUTES,
+      when: getStartOfNextDay(now) + 1000,
     });
+  }
+
+  function getStartOfNextDay(timestamp: number): number {
+    const date: Date = new Date(timestamp);
+    date.setHours(24, 0, 0, 0);
+    return date.getTime();
   }
 
   function withExtensionCredit(message: string): string {
@@ -906,7 +996,20 @@ namespace FerbToolsBackground {
       return false;
     }
 
-    return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('file://');
+    return url.startsWith('http://') || url.startsWith('https://');
+  }
+
+  function isExtensionSender(sender: chrome.runtime.MessageSender): boolean {
+    return sender.id === chrome.runtime.id;
+  }
+
+  function isPopupSender(sender: chrome.runtime.MessageSender): boolean {
+    const popupUrl: string = chrome.runtime.getURL('pages/popup.html');
+    return sender.id === chrome.runtime.id && !sender.tab && typeof sender.url === 'string' && sender.url.startsWith(popupUrl);
+  }
+
+  function isContentScriptSender(sender: chrome.runtime.MessageSender): boolean {
+    return sender.id === chrome.runtime.id && typeof sender.tab?.id === 'number' && isInjectableUrl(sender.url);
   }
 
   function isCompleteCheckInMessage(message: unknown): message is NoticeCompleteCheckInMessage {

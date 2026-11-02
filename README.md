@@ -14,7 +14,7 @@ Current tools:
 
 ## Version
 
-Current version: `1.20.0`
+Current version: `1.20.1`
 
 Versioning uses semantic versioning:
 
@@ -22,44 +22,42 @@ Versioning uses semantic versioning:
 - Minor: user-visible tool, UI, workflow, or behavior update.
 - Major: breaking storage, package, or workflow change.
 
+Small related fixes are grouped into the current update batch instead of creating a version for every edit. Use `Unreleased` for work toward a future release, then consolidate its notes when that release is prepared. Historical patch notes below are grouped by minor version; the ranges retain their original version numbers.
+
+The package, lockfile root package, extension manifest, popup fallback label, landing page, and production package must agree on the current version. Runtime version labels and feature logs read the extension manifest.
+
 ## Version Notes
 
-### 1.20.0
+### Unreleased
 
-- Adds a saved on/off setting for Fix SFCC Toolkit URL.
-- Rewrites existing, dynamically added, modified, and clicked Storefront Editing links to the correct STG or DEV host.
-- Prefixes feature console messages with the FerbTools name and current extension version.
+- Adds Light, Dark, and System appearance modes in Settings, saves the preference, and applies it before the popup renders.
+- Adapts inputs, report links, KPI indicators, switches, scrollbars, and the Settings drawer to the selected appearance.
+- Unifies popup actions, report links, success indicators, and the ready-to-checkout badge around the blue accent; failures remain red and unavailable data stays neutral.
 
-### 1.19.1
+### 1.20.0–1.20.1
 
-- Fixes the split Jira report actions so each Run button has its own busy state and updates only its matching preview.
+- Adds a saved on/off setting for Fix SFCC Toolkit URL, handling existing links, DOM updates, and captured clicks with versioned FerbTools console messages.
+- Hardens extension messaging, Jira report HTML rendering, Content Asset XML escaping, and extension-page CSP.
+- Reduces unnecessary Content Asset, Jira API, storage, and badge refresh work while preserving first-content library detection for list exports.
+- Shares Jira site URL and Role consistently across Monthly KPI, Work Plan, and Result, and preserves edited check-in time when a reminder is refreshed.
+- Limits the SFCC Toolkit URL Fix content script to STG/DEV hostname labels and validates configured Jira origins before API access.
+- Fixes On Deadline to compare Completed Date (`customfield_10091`) against Due date through the full cutoff day, with a separate cache to avoid reusing results calculated from Resolved.
+- Shows N/A with an empty On Deadline bar when no tasks have both dates; other failed metrics still make the overall KPI FAIL.
 
-### 1.19.0
+### 1.19.0–1.19.1
 
 - Adds a `Không làm tròn` (`0 phút`) option to Check-in Reminder so checkout can use the exact calculated time.
-- Splits Jira Report into independent Jira Work Plan and Jira Result cards with separate Generate and Copy actions.
+- Splits Jira Report into independent Jira Work Plan and Jira Result cards, with separate Run and Copy actions, busy states, and preview updates.
 - Adds a Result date picker, defaults it to today, and applies the selected full-day range to Jira JQL automatically.
 - Splits visibility controls for Jira Work Plan and Jira Result while migrating the previous Jira Report visibility setting.
 
-### 1.18.3
+### 1.18.0–1.18.3
 
+- Adds saved visibility toggles for Check-in Reminder, Content Asset Export, Content Asset List Export, Monthly KPI, and Jira Report, hiding unused cards and function-specific settings.
+- Disables the background Check-in Reminder when hidden; showing it again leaves its Enabled switch off until explicitly enabled.
+- Waits for the requested month/year URL and matching attendance table before reading a reused 1Office tab.
+- Expands popup status messages to multiple lines and places Monthly KPI above Jira Report after layout adjustments.
 - Orders Content Asset page attributes by the SFCC schema so `<page-title>` is exported before `<page-description>` for both single and list exports.
-
-### 1.18.2
-
-- Fixes the 1Office reused-tab race by waiting for the requested month/year URL and the matching attendance table before reading data.
-- Expands popup status messages to multiple lines so full errors remain visible.
-- Moves Monthly KPI back above Jira Report.
-
-### 1.18.1
-
-- Moves Monthly KPI to the bottom of the popup tool list, after Jira Report.
-
-### 1.18.0
-
-- Adds saved visibility toggles for Check-in Reminder, Content Asset Export, Content Asset List Export, Monthly KPI, and Jira Report.
-- Hides disabled tool cards and their function-specific settings while keeping the visibility controls available in the Settings drawer.
-- Disables the background Check-in Reminder when that function is hidden; showing it again leaves its internal Enabled switch off until explicitly enabled.
 
 ### 1.17.0
 
@@ -102,92 +100,34 @@ Versioning uses semantic versioning:
 - Adds a saved Owner setting shared by Jira Work Plan and Result generation.
 - Synchronizes the landing page with the complete tool set and displays the current version.
 
-### 1.11.1
+### 1.11.0–1.11.1
 
-- Uses the first content asset to determine the shared library wrapper for Content Asset List exports, with the active list library as fallback when fetched HTML lacks UI state.
-- Displays Jira Work Plan estimations in bold with an `Est:` prefix.
+- Includes the library ID in Content Asset List exports, using the first content asset to determine the library wrapper and the active list library as fallback.
+- Appends each Jira task estimation to Work Plan in bold with an `Est:` prefix and treats `0 minutes` as `30 minutes`.
 - Reads the popup version from the extension manifest to keep the displayed version synchronized.
 
-### 1.11.0
+### 1.10.0–1.10.4
 
-- Includes the library ID on exported Content Asset List library tags.
-- Appends each Jira task estimation to Work Plan entries and treats `0 minutes` as `30 minutes`.
-
-### 1.10.4
-
+- Adds Jira Report with Work Plan/Result previews and Copy actions.
+- Uses bullet formatting for Result, restores the last generated report, fixes message response handling, and expands the report section when generating.
 - Standardizes popup color, text, font-size, and button styling.
+- Aligns popup scrollbars across tool lists, textareas, and report previews.
 
-### 1.10.3
-
-- Aligns popup scrollbars across tool lists, textareas, and Jira report previews.
-
-### 1.10.2
-
-- Fixes Jira Report message response handling and expands the report section when generating.
-
-### 1.10.1
-
-- Uses bullet formatting for Jira Result and keeps the last generated Jira report in the popup.
-
-### 1.10.0
-
-- Added Jira Report in the extension popup with Work Plan/Result preview and copy actions.
-
-### 1.9.3
-
-- Keeps the Check-in switch transition disabled until the initial checked state has been committed.
-
-### 1.9.2
-
-- Prevents the Check-in switch knob from animating when the popup first opens.
-
-### 1.9.1
-
-- Ensures exported library XML always has a newline after the opening `<library>` tag.
-
-### 1.9.0
+### 1.9.0–1.9.3
 
 - Saves Content Asset List Export textbox, filename, and parallel settings.
-- Added filename input for list exports and blank lines between exported content nodes.
-- Improved list export progress ranges and popup card alignment.
+- Adds a list export filename input, blank lines between content nodes, and a newline after the opening `<library>` tag.
+- Improves list export progress ranges and popup card alignment.
+- Prevents the Check-in switch from animating before its initial checked state has loaded.
 
-### 1.8.7
+### 1.8.0–1.8.7
 
-- Removed false CSRF error detection from normal SFCC responses that include the warning string inside script source.
-
-### 1.8.6
-
-- Restored parallel Content Asset list searches with one cloned list page per worker.
-- Extracts CSRF tokens from SFCC `CSRFInjector` scripts when the cloned form has no hidden token input.
-
-### 1.8.5
-
-- Splits Content Asset List Export IDs by whitespace, comma, or semicolon so pasted IDs do not merge into one search term.
-
-### 1.8.4
-
-- Runs Content Asset list searches sequentially so each response supplies the CSRF token for the next search.
-- Keeps detail-page XML builds parallel after each detail link is found.
-
-### 1.8.3
-
-- Uses the actual `ContentListForm.action` URL when cloning the SFCC list page for batch searches.
-- Falls back to the current DOM form only if the cloned page does not include `ContentListForm`.
-
-### 1.8.2
-
-- Validates Content Asset List Export against the real `ContentListForm` before running.
-- Fetches a fresh list page per batch item so each search uses a fresh CSRF token.
-
-### 1.8.1
-
-- Auto-injects Content Asset scripts into the active SFCC tab before retrying export messages.
-- Uses separate refresh messages for detail-page and list-page exports.
-
-### 1.8.0
-
-- Added Content Asset List Export for newline-separated content asset IDs from a Business Manager content list page.
-- Added parallel export control and shared XML library wrapper for list exports.
+- Adds Content Asset List Export from the Business Manager content list, with parallel workers and a shared library XML wrapper.
+- Accepts IDs separated by whitespace, commas, or semicolons.
+- Validates the real `ContentListForm`, uses its action URL, and handles CSRF tokens from hidden inputs or `CSRFInjector` scripts.
+- Stabilizes search concurrency and list-page fallback, ending this series with parallel searches using a cloned page per worker.
+- Auto-injects Content Asset scripts when needed and provides separate detail/list refresh guidance.
+- Removes false CSRF error detection triggered by warning strings inside normal SFCC script source.
 
 ### 1.7.0
 
@@ -199,61 +139,31 @@ Versioning uses semantic versioning:
 - Updated Check-in popup rules to skip weekends and skip startup prompts after the configured latest check-in time.
 - Prioritized the current day so stale prompts or checkout reminders from previous days no longer show after reopening the machine.
 
-### 1.5.1
+### 1.5.0–1.5.1
 
-- Removed startup setup loading text from the global popup status.
-- Added a runtime message timeout so Check-in setup cannot stay busy forever when background does not respond.
+- Moves popup orchestration into `src/app/popup.ts`, with helpers in each feature folder and status at the top of the panel.
+- Removes startup setup loading text and adds a Check-in runtime message timeout so setup cannot remain busy indefinitely.
 
-### 1.5.0
+### 1.4.0–1.4.2
 
-- Moved popup orchestration into global `src/app/popup.ts`.
-- Split popup feature helpers into each feature folder.
-- Moved popup status to the top of the panel.
-
-### 1.4.2
-
-- Kept tool setup panels collapsed by default and removed extra popup helper text.
-- Moved Content Asset Export progress detail to console logging while keeping percent progress in the Run button.
-
-### 1.4.1
-
-- Added `npm run watch` for automatic TypeScript and static file rebuilds during extension development.
-
-### 1.4.0
-
-- Moved Check-in Reminder setup into an expandable tool card.
-- Added expandable Content Asset Export setup for locales and site mapping.
-- Content Asset Export now reads saved setup from `chrome.storage.local`.
+- Adds expandable Check-in and Content Asset setup panels, collapsed by default, with saved locale/site mapping from `chrome.storage.local`.
+- Moves detailed Content Asset progress to the console while keeping percentage progress in the Run button.
+- Adds `npm run watch` for automatic TypeScript and static file rebuilds.
 
 ### 1.3.0
 
 - Added percentage progress feedback for Content Asset Export runs.
 
-### 1.2.1
+### 1.2.0–1.2.1
 
-- Typed and reorganized Content Asset Export internals without changing export behavior.
-- Split site IDs and allowed locales into `src/features/content-asset/config.ts`.
-- Added reusable helper functions to prepare for future list-based content ID export.
+- Converts Content Asset Export to TypeScript and a manifest-loaded content script invoked through tab messages.
+- Extracts site IDs and locales into `src/features/content-asset/config.ts` and introduces reusable typed helpers for later batch export support.
 
-### 1.2.0
+### 1.1.0–1.1.1
 
-- Converted Content Asset Export to TypeScript and a manifest-loaded content script.
-- Moved Content Asset Export site and locale settings into `src/features/content-asset/config.ts`.
-- Popup now sends a tab message to run the exporter instead of injecting the exporter file.
-
-### 1.1.1
-
-- Moved the Content Asset Export source into `src/features/content-asset/content-asset-export.js`.
-- Kept the exporter script logic unchanged while aligning the file name and runtime path with the tool structure.
-
-### 1.1.0
-
-- Added a multi-tool popup hub with Check-in Reminder and Content Asset Export.
-- Added popup version display and this README version note section.
-- Added extension injection flow for Content Asset Export.
-- Updated checkout rounding so seconds inside a rounded minute do not push to the next slot.
-- Updated the extension badge countdown to include minutes.
-- Removed extra markdown docs; README is now the single markdown reference.
+- Adds a multi-tool popup with Check-in Reminder, Content Asset Export, version display, and export script injection.
+- Organizes Content Asset Export under its feature folder and consolidates Markdown documentation into this README.
+- Fixes checkout rounding so seconds inside a rounded minute do not push to the next slot, and includes minutes in the badge countdown.
 
 ### 1.0.0
 
@@ -321,6 +231,7 @@ src/
   features/check-in/popup.ts
   features/sfcc-toolkit-url-fix/content.ts
   features/sfcc-toolkit-url-fix/popup.ts
+  shared/theme.ts
   shared/types.d.ts
 static/
   icons/
@@ -335,9 +246,9 @@ dist/
 
 ## Release Checklist
 
-1. Update versions in `package.json`, `package-lock.json`, `static/manifest.json`, and this README.
-2. Add a short note under `Version Notes`.
-3. Run `npm ci`.
-4. Run `npm run build:production`.
+1. Group related changes into one release and select a version only when preparing that release.
+2. Synchronize `package.json`, the root versions in `package-lock.json`, `static/manifest.json`, the fallback label in `static/pages/popup.html`, the current version in this README, and all version labels in `docs/index.html`.
+3. Consolidate pending notes under `Version Notes`; preserve historical version ranges.
+4. Run `nvm use` before npm commands, then `npm ci` and `npm run build:production`.
 5. Load `dist` in Chrome and smoke test the popup tools.
-6. Run `npm run pack:production`.
+6. Run `npm run pack:production` and verify its manifest version matches the source manifest.

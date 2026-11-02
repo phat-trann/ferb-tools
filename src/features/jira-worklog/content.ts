@@ -1,12 +1,13 @@
 namespace FerbToolsJiraWorklogContentFeature {
-  const WINDOW_FLAG = '__ferbToolsJiraWorklogBootstrappedV2__';
+  const WINDOW_FLAG = '__ferbToolsJiraWorklogBootstrappedV3__';
   const PAGE_SIZE = 100;
+  const COMPLETED_DATE_FIELD = 'customfield_10091';
 
   interface JiraIssueSummary {
     key: string;
     summary: string;
     dueDate: string;
-    resolutionDate: string;
+    completedDate: string;
   }
 
   interface JiraWorklogValue {
@@ -27,10 +28,10 @@ namespace FerbToolsJiraWorklogContentFeature {
     chrome.runtime.onMessage.addListener(
       (
         message: unknown,
-        _sender: chrome.runtime.MessageSender,
+        sender: chrome.runtime.MessageSender,
         sendResponse: (response: JiraWorklogResponse) => void
       ): boolean | void => {
-        if (!isStartMessage(message)) {
+        if (sender.id !== chrome.runtime.id || !isStartMessage(message)) {
           return;
         }
 
@@ -56,14 +57,19 @@ namespace FerbToolsJiraWorklogContentFeature {
     }
 
     const range: MonthRange = getMonthRange(settings.month, cutoffDate);
-    const myself: Record<string, unknown> = await fetchJiraRecord('/rest/api/3/myself');
+    const [myself, issues, completedIssues, ncIssues]: [
+      Record<string, unknown>,
+      JiraIssueSummary[],
+      JiraIssueSummary[],
+      JiraIssueSummary[]
+    ] = await Promise.all([
+      fetchJiraRecord('/rest/api/3/myself'),
+      findWorklogIssues(range),
+      findCompletedIssues(range),
+      findNcIssues(range),
+    ]);
     const accountId: string = readRequiredString(myself.accountId, 'Jira không trả về account ID hiện tại.');
     const displayName: string = readOptionalString(myself.displayName) || accountId;
-    const [issues, completedIssues, ncIssues]: [JiraIssueSummary[], JiraIssueSummary[], JiraIssueSummary[]] = await Promise.all([
-      findWorklogIssues(accountId, range),
-      findCompletedIssues(accountId, range),
-      findNcIssues(accountId, range),
-    ]);
     const limiter: TaskLimiter = createTaskLimiter(settings.concurrency);
     const worklogsByIssue: JiraWorklogValue[][] = await Promise.all(
       issues.map((issue: JiraIssueSummary): Promise<JiraWorklogValue[]> => {
@@ -98,10 +104,10 @@ namespace FerbToolsJiraWorklogContentFeature {
     });
 
     completedIssues.forEach((issue: JiraIssueSummary): void => {
-      const resolvedDate: string = issue.resolutionDate.slice(0, 10);
-      if (issue.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(resolvedDate)) {
+      const completedDate: string = issue.completedDate.slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(issue.dueDate) && /^\d{4}-\d{2}-\d{2}$/.test(completedDate)) {
         completedWithDueDate += 1;
-        if (resolvedDate <= issue.dueDate) {
+        if (completedDate <= issue.dueDate) {
           completedOnTime += 1;
         }
       }
@@ -125,25 +131,24 @@ namespace FerbToolsJiraWorklogContentFeature {
     };
   }
 
-  function findWorklogIssues(accountId: string, range: MonthRange): Promise<JiraIssueSummary[]> {
-    const escapedAccountId: string = escapeJqlString(accountId);
-    const jql: string = `worklogAuthor = "${escapedAccountId}" AND worklogDate >= "${range.from}" AND worklogDate <= "${range.to}"`;
-    return searchIssues(jql);
+  function findWorklogIssues(range: MonthRange): Promise<JiraIssueSummary[]> {
+    const jql: string = `worklogAuthor = currentUser() AND worklogDate >= "${range.from}" AND worklogDate <= "${range.to}"`;
+    return searchIssues(jql, 'key,summary');
   }
 
-  function findCompletedIssues(accountId: string, range: MonthRange): Promise<JiraIssueSummary[]> {
-    const escapedAccountId: string = escapeJqlString(accountId);
-    const jql: string = `assignee = "${escapedAccountId}" AND resolutiondate >= "${range.from}" AND resolutiondate <= "${range.to}"`;
-    return searchIssues(jql);
+  function findCompletedIssues(range: MonthRange): Promise<JiraIssueSummary[]> {
+    const endExclusive = new Date(`${range.to}T00:00:00Z`);
+    endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
+    const jql: string = `assignee = currentUser() AND cf[10091] >= "${range.from}" AND cf[10091] < "${endExclusive.toISOString().slice(0, 10)}"`;
+    return searchIssues(jql, `key,duedate,${COMPLETED_DATE_FIELD}`);
   }
 
-  function findNcIssues(accountId: string, range: MonthRange): Promise<JiraIssueSummary[]> {
-    const escapedAccountId: string = escapeJqlString(accountId);
-    const jql: string = `assignee = "${escapedAccountId}" AND issuetype = "NC" AND created >= "${range.from}" AND created <= "${range.to}"`;
-    return searchIssues(jql);
+  function findNcIssues(range: MonthRange): Promise<JiraIssueSummary[]> {
+    const jql: string = `assignee = currentUser() AND issuetype = "NC" AND created >= "${range.from}" AND created <= "${range.to}"`;
+    return searchIssues(jql, 'key');
   }
 
-  async function searchIssues(jql: string): Promise<JiraIssueSummary[]> {
+  async function searchIssues(jql: string, fields = `key,summary,duedate,${COMPLETED_DATE_FIELD}`): Promise<JiraIssueSummary[]> {
     const issuesByKey: Map<string, JiraIssueSummary> = new Map<string, JiraIssueSummary>();
     let nextPageToken: string | null = null;
 
@@ -151,7 +156,7 @@ namespace FerbToolsJiraWorklogContentFeature {
       const params = new URLSearchParams({
         jql,
         maxResults: String(PAGE_SIZE),
-        fields: 'key,summary,duedate,resolutiondate',
+        fields,
       });
       if (nextPageToken) {
         params.set('nextPageToken', nextPageToken);
@@ -164,17 +169,17 @@ namespace FerbToolsJiraWorklogContentFeature {
         if (!isRecord(candidate)) {
           return;
         }
-        const key: string = readOptionalString(candidate.key);
+        const key: string = readOptionalString(candidate.key) || readOptionalString(candidate.id);
         if (!key) {
           return;
         }
 
-        const fields: Record<string, unknown> = isRecord(candidate.fields) ? candidate.fields : {};
+        const issueFields: Record<string, unknown> = isRecord(candidate.fields) ? candidate.fields : {};
         issuesByKey.set(key, {
           key,
-          summary: readOptionalString(fields.summary),
-          dueDate: readOptionalString(fields.duedate),
-          resolutionDate: readOptionalString(fields.resolutiondate),
+          summary: readOptionalString(issueFields.summary),
+          dueDate: readOptionalString(issueFields.duedate),
+          completedDate: readOptionalString(issueFields[COMPLETED_DATE_FIELD]),
         });
       });
 
@@ -191,9 +196,17 @@ namespace FerbToolsJiraWorklogContentFeature {
   async function fetchIssueWorklogs(issueKey: string, accountId: string, range: MonthRange): Promise<JiraWorklogValue[]> {
     const values: JiraWorklogValue[] = [];
     let startAt = 0;
+    const dayBufferMs: number = 24 * 60 * 60 * 1000;
+    const startedAfter: number = Date.parse(`${range.from}T00:00:00Z`) - dayBufferMs;
+    const startedBefore: number = Date.parse(`${range.to}T23:59:59Z`) + dayBufferMs;
 
     while (true) {
-      const params = new URLSearchParams({ startAt: String(startAt), maxResults: String(PAGE_SIZE) });
+      const params = new URLSearchParams({
+        startAt: String(startAt),
+        maxResults: String(PAGE_SIZE),
+        startedAfter: String(startedAfter),
+        startedBefore: String(startedBefore),
+      });
       const page: Record<string, unknown> = await fetchJiraRecord(`/rest/api/3/issue/${encodeURIComponent(issueKey)}/worklog?${params.toString()}`);
       const worklogs: unknown[] = Array.isArray(page.worklogs) ? page.worklogs : [];
 
@@ -343,7 +356,7 @@ namespace FerbToolsJiraWorklogContentFeature {
   }
 
   function isStartMessage(message: unknown): message is JiraWorklogStartMessage {
-    if (!isRecord(message) || message.type !== 'RUN_JIRA_WORKLOG_SYNC_V2' || !isRecord(message.settings)) {
+    if (!isRecord(message) || message.type !== 'RUN_JIRA_WORKLOG_SYNC_V3' || !isRecord(message.settings)) {
       return false;
     }
     return (

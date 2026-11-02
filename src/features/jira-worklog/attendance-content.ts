@@ -9,10 +9,10 @@ namespace FerbToolsAttendanceContentFeature {
     chrome.runtime.onMessage.addListener(
       (
         message: unknown,
-        _sender: chrome.runtime.MessageSender,
+        sender: chrome.runtime.MessageSender,
         sendResponse: (response: AttendanceResponse) => void
       ): boolean | void => {
-        if (!isStartMessage(message)) {
+        if (sender.id !== chrome.runtime.id || !isStartMessage(message)) {
           return;
         }
 
@@ -92,13 +92,21 @@ namespace FerbToolsAttendanceContentFeature {
     }
 
     return new Promise<HTMLTableElement>((resolve, reject): void => {
+      let checkScheduled = false;
       const observer = new MutationObserver((): void => {
-        const table: HTMLTableElement | null = findAttendanceTable(month);
-        if (table) {
-          observer.disconnect();
-          window.clearTimeout(timeoutId);
-          resolve(table);
+        if (checkScheduled) {
+          return;
         }
+        checkScheduled = true;
+        window.requestAnimationFrame((): void => {
+          checkScheduled = false;
+          const table: HTMLTableElement | null = findAttendanceTable(month);
+          if (table) {
+            observer.disconnect();
+            window.clearTimeout(timeoutId);
+            resolve(table);
+          }
+        });
       });
       const timeoutId: number = window.setTimeout((): void => {
         observer.disconnect();

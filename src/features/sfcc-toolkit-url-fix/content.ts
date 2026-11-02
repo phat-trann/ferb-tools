@@ -26,11 +26,11 @@ namespace FerbToolsSfccToolkitUrlFixContentFeature {
   let clickListenerAttached = false;
 
   function detectEnvironment(hostname: string): Environment | null {
-    const normalizedHostname: string = hostname.toLowerCase();
-    if (normalizedHostname.includes('.stg')) {
+    const labels: string[] = hostname.toLowerCase().split('.');
+    if (labels.includes('stg')) {
       return 'stg';
     }
-    if (normalizedHostname.includes('.dev')) {
+    if (labels.includes('dev')) {
       return 'dev';
     }
     return null;
@@ -67,6 +67,7 @@ namespace FerbToolsSfccToolkitUrlFixContentFeature {
   function fixLinks(root: Node): void {
     if (root instanceof HTMLAnchorElement) {
       fixLink(root);
+      return;
     }
 
     if (root instanceof Document || root instanceof Element) {
@@ -157,14 +158,16 @@ namespace FerbToolsSfccToolkitUrlFixContentFeature {
     });
   }
 
-  chrome.storage.onChanged.addListener(onStorageChanged);
-  void readEnabled().then(applyEnabled);
+  if (environment) {
+    chrome.storage.onChanged.addListener(onStorageChanged);
+    void readEnabled().then(applyEnabled);
 
-  toolkitWindow.__ferbToolsSfccToolkitUrlFix = {
-    fixURL,
-    stop(): void {
-      deactivate(false);
-      chrome.storage.onChanged.removeListener(onStorageChanged);
-    },
-  };
+    toolkitWindow.__ferbToolsSfccToolkitUrlFix = {
+      fixURL,
+      stop(): void {
+        deactivate(false);
+        chrome.storage.onChanged.removeListener(onStorageChanged);
+      },
+    };
+  }
 }
